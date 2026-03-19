@@ -1,7 +1,7 @@
-LLM_BASE_URL = "http://10.0.0.181:8070/v1"
-# LLM_MODEL = "Qwen3.5-35B-A3B-Q4_K_M:Thinking"
-LLM_MODEL = "Qwen3.5-27B-Q4:Instruct"
-# LLM_MODEL = "GLM-4.7-Flash:UD-Q4_K_XL"
+import os
+
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8070/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "Qwen3.5-27B-Q4:Instruct")
 
 RSS_SOURCES = {
     "baseball": [

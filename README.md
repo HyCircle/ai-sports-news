@@ -60,6 +60,24 @@ uv sync
 3. 运行
 
 ```bash
+export LLM_BASE_URL="http://your-server:8070/v1"
+export LLM_MODEL="your-model-name"
+uv run spnews
+```
+
+Windows PowerShell:
+
+```powershell
+$env:LLM_BASE_URL="http://your-server:8070/v1"
+$env:LLM_MODEL="your-model-name"
+uv run spnews
+```
+
+Windows CMD:
+
+```cmd
+set LLM_BASE_URL=http://your-server:8070/v1
+set LLM_MODEL=your-model-name
 uv run spnews
 ```
 
@@ -67,21 +85,17 @@ uv run spnews
 
 ## 配置
 
-配置文件：`src/spnews/config.py`
+通过环境变量配置：
 
-- LLM 服务地址：`LLM_BASE_URL`
-- 模型名：`LLM_MODEL`
-- RSS 源列表：`RSS_SOURCES`
-- 时区：`DEFAULT_TIMEZONE`（当前为 `America/Chicago`）
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `LLM_BASE_URL` | LLM API 地址 | `http://localhost:8070/v1` |
+| `LLM_MODEL` | 模型名称 | `Qwen3.5-27B-Q4:Instruct` |
 
-当前默认配置示例：
+RSS 源与时区在代码中固定配置：
 
-```python
-LLM_BASE_URL = "http://10.0.0.181:8070/v1"
-LLM_MODEL = "Qwen3.5-35B-A3B-Q4_K_M:Thinking"
-# LLM_MODEL = "GLM-4.7-Flash:UD-Q4_K_XL"
-DEFAULT_TIMEZONE = "America/Chicago"
-```
+- RSS 源列表：`src/spnews/config.py` 的 `RSS_SOURCES`
+- 时区：`DEFAULT_TIMEZONE`（`America/Chicago`）
 
 ## CLI 用法
 
