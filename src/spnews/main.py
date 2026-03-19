@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from .config import DEFAULT_TIMEZONE
 from .indexer import update_report_indexes
 from .report import build_full_report
 
@@ -39,7 +41,7 @@ def main():
     if args.output:
         out_path = Path(args.output)
     else:
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(ZoneInfo(DEFAULT_TIMEZONE)).strftime("%Y-%m-%d")
         out_path = Path("output") / f"{date_str}_sports_daily.md"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
