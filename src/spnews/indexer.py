@@ -43,7 +43,9 @@ def _build_rows(reports: list[Path]) -> list[str]:
         date = match.group(1)
         coverage = _sport_coverage(report)
         html_link = f"output/{report.stem}.html"
-        rows.append(f"| [{date}]({html_link}) | {coverage} |")
+        rows.append(
+            f"<tr><td><a href=\"{html_link}\">{date}</a></td><td>{coverage}</td></tr>"
+        )
     return rows
 
 
@@ -65,10 +67,15 @@ def _ensure_archives_page(path: Path) -> None:
 
 历史日报列表如下，按日期倒序排列。
 
-| 日期 | 涵盖运动 |
-|------|----------|
+<table>
+    <thead>
+        <tr><th>日期</th><th>涵盖运动</th></tr>
+    </thead>
+    <tbody>
 <!-- ARCHIVE_LIST_START -->
 <!-- ARCHIVE_LIST_END -->
+    </tbody>
+</table>
 
 返回首页: [spnews 日报首页](./)
 """
@@ -93,9 +100,14 @@ def update_report_indexes(project_root: Path | None = None, recent_limit: int = 
     all_rows = _build_rows(reports)
 
     recent_block = "\n".join([
-        "| 📅 日期 | 🏆 涵盖运动 |",
-        "|---------|-------------|",
+        "<table>",
+        "  <thead>",
+        "    <tr><th>📅 日期</th><th>🏆 涵盖运动</th></tr>",
+        "  </thead>",
+        "  <tbody>",
         *recent_rows,
+        "  </tbody>",
+        "</table>",
         "",
         f"> 共 {len(reports)} 份日报，查看完整历史列表: [Archived Reports](archives.html)",
     ])
