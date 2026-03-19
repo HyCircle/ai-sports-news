@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .indexer import update_report_indexes
 from .report import build_full_report
 
 
@@ -44,6 +45,10 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
     print(f"\nReport saved to: {out_path}")
+
+    # Keep homepage report lists in sync with output/ directory.
+    update_report_indexes(Path.cwd())
+    print("Homepage and archive indexes updated.")
 
 
 if __name__ == "__main__":

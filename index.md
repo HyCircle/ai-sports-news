@@ -24,11 +24,18 @@
 3. GitHub Pages 自动渲染为 HTML
 -->
 
+<!-- REPORT_LIST_START -->
 | 📅 日期 | 🏆 涵盖运动 |
 |---------|-------------|
-| [2026-03-19](output/2026-03-19_sports_daily.md) | MLB · NFL · F1 |
+| [2026-03-19](output/2026-03-19_sports_daily.html) | MLB · NFL · F1 |
+| [2026-03-17](output/2026-03-17_sports_daily.html) | MLB · NFL · F1 |
+| [2026-03-16](output/2026-03-16_sports_daily.html) | MLB · NFL · F1 |
+| [2026-03-15](output/2026-03-15_sports_daily.html) | MLB · NFL · F1 |
 
-> 💡 **提示**: 点击上面的日期跳转到已渲染的报告页面。每上传一个新 MD 文件，只需在此手动添加一行链接即可（稍后计划自动化）。
+> 共 4 份日报，查看完整历史列表: [Archived Reports](archives.html)
+<!-- REPORT_LIST_END -->
+
+> 💡 **提示**: 报告列表会在每次运行 `uv run spnews` 后自动更新，默认展示最近 10 条。
 
 ---
 

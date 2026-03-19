@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from html import escape
 from zoneinfo import ZoneInfo
 
 from .config import SPORT_NAMES, DEFAULT_TIMEZONE
@@ -20,11 +21,17 @@ def _source_links(articles: list[dict]) -> str:
     for art in articles:
         if art["link"] not in seen:
             seen.add(art["link"])
-            lines.append(f"  - [{art['source_name']}: {art['title']}]({art['link']})")
+            title = escape(f"{art['source_name']}: {art['title']}")
+            link = escape(art["link"], quote=True)
+            lines.append(
+                f"<li><a href=\"{link}\" target=\"_blank\" rel=\"noopener noreferrer\">{title}</a></li>"
+            )
     inner = "\n".join(lines)
     return (
-        f"<details><summary>\u4fe1\u606f\u6765\u6e90({len(lines)})</summary>\n\n"
-        f"{inner}\n\n</details>"
+        f"<details>\n"
+        f"<summary>\u4fe1\u606f\u6765\u6e90({len(lines)})</summary>\n"
+        f"<ul>\n{inner}\n</ul>\n"
+        f"</details>"
     )
 
 
