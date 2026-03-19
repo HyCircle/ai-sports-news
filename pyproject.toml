@@ -1,5 +1,5 @@
 [project]
-name = "spnews"
+name = "ai-sports-news"
 version = "0.1.0"
 description = "Lightweight sports news automation tool"
 readme = "README.md"
@@ -10,6 +10,9 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "tzdata>=2025.3",
 ]
+
+[tool.uv]
+package = true
 
 [project.scripts]
 spnews = "spnews.main:main"
