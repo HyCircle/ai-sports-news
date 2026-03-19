@@ -1,7 +1,4 @@
----
----
-
-# spnews
+# ai-sports-news
 
 轻量级体育资讯自动化工具：抓取 RSS 新闻，按事件聚类，调用本地 LLM 生成中文 Markdown 早报。
 
@@ -9,6 +6,8 @@
 - 橄榄球（NFL）
 - 棒球（MLB）
 - F1 赛车
+
+**日报首页：[https://hycircle.github.io/ai-sports-news/](https://hycircle.github.io/ai-sports-news/)**
 
 ## 功能概览
 
