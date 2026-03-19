@@ -88,6 +88,6 @@ spnews/
 
 ---
 
-🎯 想深入了解项目？ → [访问项目介绍页](landing.html)
+🎯 想深入了解项目？ → [访问 GitHub Repo](https://github.com/HyCircle/ai-sports-news)
 
 *Powered by 🐍 Python + ⚡ LLM API · Built with simplicity in mind*
