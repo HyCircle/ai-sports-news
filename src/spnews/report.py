@@ -90,7 +90,7 @@ def build_full_report(sports: list[str] | None = None, hours: int = 24) -> str:
             sport_sections[sport] = section
 
     if not sport_sections:
-        return f"# 体育早报 {date_str}\n\n暂无新闻。\n"
+        return f"---\n---\n\n# 体育早报 {date_str}\n\n暂无新闻。\n"
 
     sport_labels = {SPORT_NAMES.get(s, s): sec for s, sec in sport_sections.items()}
 
@@ -99,7 +99,8 @@ def build_full_report(sports: list[str] | None = None, hours: int = 24) -> str:
     overview = generate_overview(sport_labels)
 
     # Assemble report
-    report = f"# 体育早报 {date_str}\n\n"
+    report = "---\n---\n\n"
+    report += f"# 体育早报 {date_str}\n\n"
     report += f"{overview}\n\n"
     report += "---\n\n"
     for section in sport_sections.values():

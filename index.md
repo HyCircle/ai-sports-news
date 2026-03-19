@@ -1,3 +1,6 @@
+---
+---
+
 # spnews 🏈⚾🏎️
 
 轻量级体育资讯自动化工具 · RSS 抓取 + LLM 聚类 + 中文早报
@@ -73,6 +76,6 @@ spnews/
 
 ---
 
-🎯 想深入了解项目？ → [访问项目介绍页](index.html)
+🎯 想深入了解项目？ → [访问项目介绍页](landing.html)
 
 *Powered by 🐍 Python + ⚡ LLM API · Built with simplicity in mind*
