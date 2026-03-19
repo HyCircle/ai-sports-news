@@ -1,0 +1,18 @@
+[project]
+name = "spnews"
+version = "0.1.0"
+description = "Lightweight sports news automation tool"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "feedparser>=6.0.12",
+    "httpx>=0.28.1",
+    "python-dateutil>=2.9.0.post0",
+    "tzdata>=2025.3",
+]
+
+[project.scripts]
+spnews = "spnews.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

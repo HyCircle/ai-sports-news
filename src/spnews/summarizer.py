@@ -1,0 +1,84 @@
+"""LLM-based article summarization per event cluster."""
+
+from __future__ import annotations
+
+from .llm import chat
+
+from .config import REASON_LIMIT
+
+_STYLE_GUIDE = """\
+写作风格要求：
+- 以中文为主体撰写，保持客观新闻风格
+- 人名直接使用英文（如 Russell、Hamilton），仅对知名度极高的人物首次出现时加中文注释（如"Ohtani（大谷翔平）"）
+- 队名首次出现用"中文 (English)"，后续直接用英文简称或中文简称
+- 联赛/赛事缩写（NFL、MLB、WBC、F1）无需翻译
+- 仅对核心数据（比分、金额、合同年限、排名、伤病时间等）用 **加粗**；年份(2026等)、序数词(第一/首次等)、日期不加粗
+- 如涉及多笔签约/交易，用列表而非长段落
+- 严禁编造报道中没有的信息，不得推测报道未提及的后续影响或假设性场景
+- 禁止为凑篇幅而重复已述内容——信息量不足时宁可写短"""
+
+
+def summarize_event(event_name: str, articles: list[dict],
+                    importance: str, report_date: str = "") -> str:
+    """Summarize a cluster of articles about one event. Returns markdown text."""
+    sources_block = ""
+    for art in articles:
+        sources_block += (
+            f"- 标题: {art['title']}\n"
+            f"  来源: {art['source_name']}\n"
+            f"  摘要: {art['summary'][:500]}\n"
+            f"  链接: {art['link']}\n\n"
+        )
+
+    n_sources = len(articles)
+    if importance == "high":
+        if n_sources >= 5:
+            detail = "请根据信息量写 2-3 段深入总结（背景、细节、影响），信息不足时不必凑段数。"
+        elif n_sources >= 2:
+            detail = "请写 1-2 段总结核心事实与背景，不要凑段数。"
+        else:
+            detail = "信息来源有限，请用 1 段准确总结核心内容，不要推测。"
+    elif importance == "medium":
+        detail = "请用 1 段话简要总结核心内容。"
+    else:
+        detail = "请用 1-2 句话概述。"
+
+    date_hint = ""
+    if report_date:
+        date_hint = (
+            f"\n今天日期: {report_date}。"
+            '请将"周五""昨天"等相对时间转换为具体日期, 如"3月12日(周五)"。'
+        )
+
+    prompt = f"""你是一个面向双语读者的体育新闻编辑。请根据以下报道总结此事件。
+
+事件：{event_name}
+{detail}{date_hint}
+
+相关报道：
+{sources_block}
+
+{_STYLE_GUIDE}
+不要输出标题，直接输出正文。"""
+
+    return chat(prompt, reasoning_limit=REASON_LIMIT)
+
+
+def generate_overview(sport_summaries: dict[str, str]) -> str:
+    """Generate a brief bullet-point overview across all sports."""
+    combined = ""
+    for sport_name, content in sport_summaries.items():
+        combined += f"### {sport_name}\n{content}\n\n"
+
+    prompt = f"""你是体育新闻编辑。以下是今日各运动的新闻汇总。
+请输出 3-5 条 bullet point 摘要，每条一句话，概括最值得关注的事件。
+
+{combined}
+
+{_STYLE_GUIDE}
+格式：直接输出 markdown 无序列表（- 开头），不要加标题或前缀。"""
+
+    return chat(prompt, reasoning_limit=REASON_LIMIT)
+
+
+
