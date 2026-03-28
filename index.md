@@ -30,6 +30,7 @@
     <tr><th>📅 日期</th><th>🏆 涵盖运动</th></tr>
   </thead>
   <tbody>
+<tr><td><a href="output/2026-03-27_sports_daily.html">2026-03-27</a></td><td>MLB · NFL · F1</td></tr>
 <tr><td><a href="output/2026-03-26_sports_daily.html">2026-03-26</a></td><td>MLB · NFL · F1</td></tr>
 <tr><td><a href="output/2026-03-25_sports_daily.html">2026-03-25</a></td><td>MLB · NFL · F1</td></tr>
 <tr><td><a href="output/2026-03-24_sports_daily.html">2026-03-24</a></td><td>MLB · NFL · F1</td></tr>
@@ -39,11 +40,10 @@
 <tr><td><a href="output/2026-03-20_sports_daily.html">2026-03-20</a></td><td>MLB · NFL · F1</td></tr>
 <tr><td><a href="output/2026-03-19_sports_daily.html">2026-03-19</a></td><td>MLB · NFL · F1</td></tr>
 <tr><td><a href="output/2026-03-18_sports_daily.html">2026-03-18</a></td><td>MLB · NFL · F1</td></tr>
-<tr><td><a href="output/2026-03-17_sports_daily.html">2026-03-17</a></td><td>MLB · NFL · F1</td></tr>
   </tbody>
 </table>
 
-> 共 12 份日报，查看完整历史列表: [Archived Reports](archives.html)
+> 共 13 份日报，查看完整历史列表: [Archived Reports](archives.html)
 <!-- REPORT_LIST_END -->
 
 > 💡 **提示**: 报告列表会在每次运行 `uv run spnews` 后自动更新，默认展示最近 10 条。
