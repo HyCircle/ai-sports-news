@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .config import DEFAULT_TIMEZONE
+from .config import DEFAULT_TIMEZONE, DB_PATH
+from .db import mark_articles_used, save_events
 from .indexer import update_report_indexes
 from .report import build_full_report
 
@@ -22,20 +23,25 @@ def main():
         help="Sports to include (default: all)",
     )
     parser.add_argument(
-        "--hours",
-        type=int,
-        default=24,
-        help="Look back N hours (default: 24)",
-    )
-    parser.add_argument(
         "-o", "--output",
         type=str,
         default=None,
         help="Output file path (default: output/<date>_sports_daily.md)",
     )
+    parser.add_argument(
+        "--db",
+        type=str,
+        default=None,
+        help=f"Database file path (default: {DB_PATH})",
+    )
     args = parser.parse_args()
 
-    report = build_full_report(sports=args.sports, hours=args.hours)
+    db_path = Path(args.db) if args.db else DB_PATH
+
+    # Build report (fetch → pending → cluster → summarize)
+    report, events_by_sport, used_links = build_full_report(
+        sports=args.sports, db_path=db_path,
+    )
 
     # Determine output path
     if args.output:
@@ -47,6 +53,15 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
     print(f"\nReport saved to: {out_path}")
+
+    # --- Closing DB update (only after successful file write) ---
+    if used_links:
+        date_str = datetime.now(ZoneInfo(DEFAULT_TIMEZONE)).strftime("%Y-%m-%d")
+        mark_articles_used(db_path, used_links, date_str)
+        for sport, evts in events_by_sport.items():
+            save_events(db_path, date_str, sport, evts)
+        print(f"Database updated: {len(used_links)} articles marked, "
+              f"{sum(len(e) for e in events_by_sport.values())} events saved.")
 
     # Keep homepage report lists in sync with output/ directory.
     update_report_indexes(Path.cwd())

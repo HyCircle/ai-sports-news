@@ -38,3 +38,20 @@
   - `summarize_event()` 新增可选参数 `previous_coverage: str | None`
   - 当有前续报道时，在 prompt 中注入记忆提示，引导 LLM 用"此前报道..."衔接，避免重复内容
 
+## Phase 4: Refactor main.py + report.py (State-Driven Workflow)
+
+- **重构 `src/spnews/report.py`**:
+  - `build_sport_section()` 改为内部函数 `_build_sport_section()`，接收已获取的 `articles` 和 `recent_events`
+  - 不再自行调用 `fetch_sport()`，而是由 `build_full_report()` 统一编排
+  - 返回 `(md_section, generated_events, used_links)` 三元组，支持闭环更新
+  - `build_full_report()` 签名改为 `(sports, db_path)`，删除 `hours` 参数
+  - 新流程：init_db → fetch_sport → get_pending_articles → get_recent_events → _build_sport_section → overview
+  - 返回 `(report_str, events_by_sport, all_used_links)`，由调用方执行闭环 DB 更新
+  - 利用 `related_previous_event` 字段匹配前续报道，传入 `previous_coverage` 给 summarizer
+
+- **重构 `src/spnews/main.py`**:
+  - 删除 `--hours` CLI 参数
+  - 新增 `--db` CLI 参数（覆盖 DB 路径）
+  - 闭环更新：仅在 Markdown 文件写入成功后，才调用 `mark_articles_used()` 和 `save_events()`
+  - 打印 DB 更新统计信息
+
