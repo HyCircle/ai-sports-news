@@ -28,3 +28,13 @@
   - `_extract_entry()` 直接接收 `source_name` 参数，不再后续赋值
   - 仍保留 `seen_links` 做同一批次内的快速去重（避免同一次 RSS 抓取中的重复条目浪费 DB 操作）
 
+## Phase 3: Enhance cluster.py + summarizer.py
+
+- **修改 `src/spnews/cluster.py`**:
+  - `cluster_articles()` 新增可选参数 `recent_events: list[dict] | None`
+  - 当 `recent_events` 非空时，在 clustering prompt 中追加"近期已报道事件"上下文
+  - 提示 LLM 在 JSON 输出中新增 `related_previous_event` 字段，标注与历史事件的关联
+- **修改 `src/spnews/summarizer.py`**:
+  - `summarize_event()` 新增可选参数 `previous_coverage: str | None`
+  - 当有前续报道时，在 prompt 中注入记忆提示，引导 LLM 用"此前报道..."衔接，避免重复内容
+

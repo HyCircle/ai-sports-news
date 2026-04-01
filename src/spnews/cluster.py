@@ -7,11 +7,13 @@ import json
 from .llm import chat
 
 
-def cluster_articles(articles: list[dict], sport_name: str) -> list[dict]:
+def cluster_articles(articles: list[dict], sport_name: str,
+                     recent_events: list[dict] | None = None) -> list[dict]:
     """Cluster articles into events using LLM, return ranked event groups.
 
     Returns list of:
-        {"event": str, "importance": "high"|"medium"|"low", "article_indices": [int]}
+        {"event": str, "importance": "high"|"medium"|"low",
+         "article_indices": [int], "related_previous_event": str|None}
     """
     if not articles:
         return []
@@ -20,6 +22,21 @@ def cluster_articles(articles: list[dict], sport_name: str) -> list[dict]:
     article_list = ""
     for i, art in enumerate(articles):
         article_list += f"[{i}] {art['title']}\n    {art['summary'][:200]}\n"
+
+    # Build recent events context
+    memory_block = ""
+    if recent_events:
+        memory_block = "\n\n--- 近期已报道事件（供参考，避免重复） ---\n"
+        for ev in recent_events:
+            memory_block += (
+                f"- [{ev['report_date']}] {ev['event_name']} ({ev['importance']})\n"
+                f"  {ev['summary_text'][:150]}\n"
+            )
+        memory_block += (
+            "\n如果新文章是某个近期已报道事件的后续进展，请在该事件的 "
+            "related_previous_event 字段填写对应的事件名称（精确匹配上方列表）。"
+            "如果是全新事件，该字段留 null。\n"
+        )
 
     prompt = f"""你是一个体育新闻编辑。下面是最近的{sport_name}新闻文章列表。
 
@@ -35,10 +52,10 @@ def cluster_articles(articles: list[dict], sport_name: str) -> list[dict]:
 
 文章列表：
 {article_list}
-
+{memory_block}
 请严格以如下JSON格式回复，不要输出其他内容：
 [
-  {{"event": "事件名称", "importance": "high/medium/low", "article_indices": [0, 3, 5]}},
+  {{"event": "事件名称", "importance": "high/medium/low", "article_indices": [0, 3, 5], "related_previous_event": null}},
   ...
 ]
 
@@ -46,7 +63,8 @@ def cluster_articles(articles: list[dict], sport_name: str) -> list[dict]:
 - 不需要覆盖每一篇文章，被忽略的条目不要出现在 article_indices 中
 - article_indices 是上面文章的编号
 - 按重要性从高到低排序
-- 输出事件总数不超过15个"""
+- 输出事件总数不超过15个
+- related_previous_event: 如果该事件与近期报道直接相关，填写对应事件名称；否则填 null"""
 
     resp = chat(prompt)
 
