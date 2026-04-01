@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8070/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen3.5-27B-Q4:Instruct")
+
+DB_PATH = Path(os.getenv("SPNEWS_DB", "spnews.db"))
 
 RSS_SOURCES = {
     "baseball": [
