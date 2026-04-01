@@ -55,3 +55,22 @@
   - 闭环更新：仅在 Markdown 文件写入成功后，才调用 `mark_articles_used()` 和 `save_events()`
   - 打印 DB 更新统计信息
 
+## Phase 5: CLI Parameter Adjustment
+
+- 已在 Phase 4 中完成：删除 `--hours`，新增 `--db`
+- CLI 验证通过：`uv run spnews --help` 输出正确
+
+## Phase 6: README Update
+
+- **更新 `README.md`**:
+  - 项目描述增加 SQLite 数据库说明
+  - 功能概览：替换"时间窗口过滤"为数据库驱动的完整功能列表（增量抓取/待办筛选/记忆提取/闭环更新）
+  - 技术栈：新增 SQLite（内置 sqlite3）
+  - 项目结构：新增 db.py，更新各模块注释
+  - 配置项：新增 DB_PATH / SPNEWS_DB 说明
+  - CLI 用法：删除 --hours，新增 --db，更新示例
+  - 报告生成流程：从 6 步扩展为 9 步（含 DB 操作）
+  - 时间/日期规则：删除时间窗口过滤描述
+  - 新增"数据库说明"章节
+  - 开发建议：移除 --hours 示例
+
