@@ -18,3 +18,13 @@
   - `get_recent_events()`: 获取最近 N 天事件（记忆提取）
 - **修改 `src/spnews/config.py`**: 新增 `DB_PATH` 配置项（默认 `spnews.db`，可通过 `SPNEWS_DB` 环境变量覆盖）
 
+## Phase 2: Refactor fetcher.py
+
+- **重构 `src/spnews/fetcher.py`**:
+  - 删除 `hours` 参数和 24 小时时间窗口过滤逻辑（`cutoff`/`timedelta`）
+  - 删除按时间排序逻辑（聚类由 LLM 处理）
+  - 新增 `db_path` 参数，调用 `db.save_articles()` 进行 INSERT OR IGNORE 去重
+  - 函数返回类型从 `list[dict]` 改为 `int`（新插入的文章数）
+  - `_extract_entry()` 直接接收 `source_name` 参数，不再后续赋值
+  - 仍保留 `seen_links` 做同一批次内的快速去重（避免同一次 RSS 抓取中的重复条目浪费 DB 操作）
+

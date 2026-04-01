@@ -1,15 +1,17 @@
-"""RSS feed fetching with time filtering."""
+"""RSS feed fetching with database-driven deduplication."""
 
 from __future__ import annotations
 
 import html
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import feedparser
 from dateutil import parser as dateparser
 
 from .config import RSS_SOURCES
+from .db import save_articles
 
 
 def _parse_time(entry) -> datetime | None:
@@ -35,26 +37,25 @@ def _clean_html(raw: str) -> str:
     return html.unescape(text).strip()
 
 
-def _extract_entry(entry) -> dict:
+def _extract_entry(entry, source_name: str) -> dict:
     """Convert a feedparser entry to a clean dict."""
     return {
         "title": entry.get("title", "").strip(),
         "link": entry.get("link", ""),
         "summary": _clean_html(entry.get("summary", entry.get("description", ""))),
         "published": _parse_time(entry),
-        "source": entry.get("link", ""),
+        "source_name": source_name,
     }
 
 
-def fetch_sport(sport: str, hours: int = 24) -> list[dict]:
-    """Fetch recent articles for a sport within the given time window."""
-    urls = RSS_SOURCES.get(sport, [])
-    cutoff = datetime.now(timezone.utc).replace(microsecond=0)
-    from datetime import timedelta
-    cutoff = cutoff - timedelta(hours=hours)
+def fetch_sport(sport: str, db_path: str | Path) -> int:
+    """Fetch all RSS entries for a sport and save new ones to the database.
 
-    articles = []
-    seen_links = set()
+    Returns the number of newly inserted articles.
+    """
+    urls = RSS_SOURCES.get(sport, [])
+    articles: list[dict] = []
+    seen_links: set[str] = set()
 
     for url in urls:
         try:
@@ -65,20 +66,13 @@ def fetch_sport(sport: str, hours: int = 24) -> list[dict]:
 
         source_name = feed.feed.get("title", url)
         for entry in feed.entries:
-            art = _extract_entry(entry)
-            art["source_name"] = source_name
-
-            # Deduplicate by link
-            if art["link"] in seen_links:
+            art = _extract_entry(entry, source_name)
+            if not art["link"] or art["link"] in seen_links:
                 continue
             seen_links.add(art["link"])
-
-            # Time filter: keep if within window or unknown time
-            if art["published"] and art["published"] < cutoff:
-                continue
-
             articles.append(art)
 
-    # Sort by time (newest first), unknowns at end
-    articles.sort(key=lambda a: a["published"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-    return articles
+    if not articles:
+        return 0
+
+    return save_articles(db_path, articles, sport)
