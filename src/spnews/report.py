@@ -7,7 +7,7 @@ from html import escape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .config import SPORT_NAMES, DEFAULT_TIMEZONE, DB_PATH
+from .config import SPORT_NAMES, DEFAULT_TIMEZONE, DB_PATH, RSS_FETCH_DAYS
 from .db import init_db, get_pending_articles, get_recent_events
 from .fetcher import fetch_sport
 from .cluster import cluster_articles
@@ -42,10 +42,10 @@ def _build_sport_section(
     articles: list[dict],
     report_date: str,
     recent_events: list[dict] | None = None,
-) -> tuple[str | None, list[dict], list[str]]:
+) -> tuple[str | None, list[dict], list[str], list[str]]:
     """Build markdown for one sport.
 
-    Returns (md_section, generated_events, used_links).
+    Returns (md_section, generated_events, used_links, ignored_links).
     md_section is None if no articles.
     """
     sport_name = SPORT_NAMES.get(sport, sport)
@@ -55,7 +55,7 @@ def _build_sport_section(
     print(f"  {len(articles)} pending articles")
 
     if not articles:
-        return None, [], []
+        return None, [], [], []
 
     # 1. Cluster (with memory context)
     print("  Clustering articles...")
@@ -72,6 +72,7 @@ def _build_sport_section(
     md = f"## {sport_name}\n\n"
     generated_events: list[dict] = []
     used_links: list[str] = []
+    assigned_links: set[str] = set()
 
     for cluster in clusters:
         event = cluster["event"]
@@ -109,17 +110,21 @@ def _build_sport_section(
             "article_links": art_links,
         })
         used_links.extend(art_links)
+        assigned_links.update(art_links)
 
-    return md, generated_events, used_links
+    # Articles the LLM chose not to include in any cluster
+    ignored_links = [a["link"] for a in articles if a["link"] not in assigned_links]
+
+    return md, generated_events, used_links, ignored_links
 
 
 def build_full_report(
     sports: list[str] | None = None,
     db_path: str | Path | None = None,
-) -> tuple[str, dict[str, list[dict]], list[str]]:
+) -> tuple[str, dict[str, list[dict]], list[str], list[str]]:
     """Build the complete daily report using database-driven workflow.
 
-    Returns (report_markdown, events_by_sport, all_used_links).
+    Returns (report_markdown, events_by_sport, all_used_links, all_ignored_links).
     The caller is responsible for the closing DB update after writing the file.
     """
     if sports is None:
@@ -138,11 +143,12 @@ def build_full_report(
     sport_sections: dict[str, str] = {}
     all_events: dict[str, list[dict]] = {}
     all_used_links: list[str] = []
+    all_ignored_links: list[str] = []
 
     for sport in sports:
-        # 1. Incremental fetch → DB
+        # 1. Incremental fetch → DB (only entries within the configured age window)
         print(f"\n  Fetching RSS feeds for {sport}...")
-        n_new = fetch_sport(sport, db_path)
+        n_new = fetch_sport(sport, db_path, max_age_days=RSS_FETCH_DAYS)
         print(f"  {n_new} new articles saved to database")
 
         # 2. Get pending articles (report_date IS NULL)
@@ -152,16 +158,17 @@ def build_full_report(
         recent_events = get_recent_events(db_path, sport, days=3)
 
         # 4. Build section
-        section, events, links = _build_sport_section(
+        section, events, links, ignored = _build_sport_section(
             sport, articles, report_date, recent_events,
         )
         if section:
             sport_sections[sport] = section
             all_events[sport] = events
             all_used_links.extend(links)
+        all_ignored_links.extend(ignored)
 
     if not sport_sections:
-        return f"---\n---\n\n# 体育日报 {date_str}\n\n暂无新闻。\n", {}, []
+        return f"---\n---\n\n# 体育日报 {date_str}\n\n暂无新闻。\n", {}, [], []
 
     sport_labels = {SPORT_NAMES.get(s, s): sec for s, sec in sport_sections.items()}
 
@@ -179,4 +186,4 @@ def build_full_report(
 
     report += f"*生成时间: {now.strftime('%Y-%m-%d %H:%M %Z')}*\n"
     report += f"*数据来源: RSS 自动抓取 + AI 总结，仅供参考*\n"
-    return report, all_events, all_used_links
+    return report, all_events, all_used_links, all_ignored_links

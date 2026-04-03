@@ -48,14 +48,24 @@ def _extract_entry(entry, source_name: str) -> dict:
     }
 
 
-def fetch_sport(sport: str, db_path: str | Path) -> int:
+def fetch_sport(sport: str, db_path: str | Path,
+                max_age_days: int = 0) -> int:
     """Fetch all RSS entries for a sport and save new ones to the database.
+
+    Only entries published within the last *max_age_days* days are considered
+    (entries with no published date are always included).
+    Pass max_age_days=0 to disable the age filter.
 
     Returns the number of newly inserted articles.
     """
+    from datetime import timedelta
     urls = RSS_SOURCES.get(sport, [])
     articles: list[dict] = []
     seen_links: set[str] = set()
+
+    cutoff: datetime | None = None
+    if max_age_days > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
     for url in urls:
         try:
@@ -68,6 +78,9 @@ def fetch_sport(sport: str, db_path: str | Path) -> int:
         for entry in feed.entries:
             art = _extract_entry(entry, source_name)
             if not art["link"] or art["link"] in seen_links:
+                continue
+            # Age filter: skip entries older than cutoff (keep entries with no date)
+            if cutoff and art["published"] is not None and art["published"] < cutoff:
                 continue
             seen_links.add(art["link"])
             articles.append(art)

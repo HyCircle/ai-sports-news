@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS articles (
     source_name TEXT    NOT NULL DEFAULT '',
     published_at TEXT,
     fetched_at  TEXT    NOT NULL,
-    report_date TEXT
+    report_date TEXT,
+    used        INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -88,16 +89,29 @@ def get_pending_articles(db_path: str | Path, sport: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def mark_articles_used(db_path: str | Path, links: list[str],
-                       report_date: str) -> None:
-    """Set report_date for the given article links."""
-    if not links:
-        return
+def mark_articles_done(
+    db_path: str | Path,
+    report_date: str,
+    used_links: list[str],
+    ignored_links: list[str],
+) -> None:
+    """Mark all considered articles for this run.
+
+    used_links:    articles that appeared in the final report (used=1).
+    ignored_links: articles that were considered but filtered out by the LLM (used=0).
+    Both sets receive report_date so they are never re-queued as pending.
+    """
     with _connect(db_path) as conn:
-        conn.executemany(
-            "UPDATE articles SET report_date = ? WHERE link = ?",
-            [(report_date, link) for link in links],
-        )
+        if used_links:
+            conn.executemany(
+                "UPDATE articles SET report_date = ?, used = 1 WHERE link = ?",
+                [(report_date, link) for link in used_links],
+            )
+        if ignored_links:
+            conn.executemany(
+                "UPDATE articles SET report_date = ?, used = 0 WHERE link = ?",
+                [(report_date, link) for link in ignored_links],
+            )
 
 
 def save_events(db_path: str | Path, report_date: str, sport: str,

@@ -32,4 +32,6 @@ SPORT_NAMES = {
 
 DEFAULT_TIMEZONE = "America/Chicago"
 
+RSS_FETCH_DAYS = 7  # Only import RSS entries published within the last N days (0 = no limit)
+
 REASON_LIMIT = -1  # 推理预算限制，单位为 Token，-1:无限制 (default)，0:禁用
