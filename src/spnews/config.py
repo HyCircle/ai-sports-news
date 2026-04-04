@@ -22,12 +22,25 @@ RSS_SOURCES = {
         "https://www.skysports.com/rss/12433",
         "https://the-race.com/feed/",
     ],
+    "soccer": [
+        "https://www.espn.com/espn/rss/soccer/news",
+        "https://feeds.bbci.co.uk/sport/football/rss.xml",
+        "https://www.skysports.com/rss/12040",
+        "https://www.cbssports.com/rss/headlines/soccer/",
+    ],
+    "basketball": [
+        "https://www.espn.com/espn/rss/nba/news",
+        "https://www.cbssports.com/rss/headlines/nba/",
+        "https://bleacherreport.com/nba.rss",
+    ],
 }
 
 SPORT_NAMES = {
     "baseball": "棒球 (MLB)",
     "football": "橄榄球 (NFL)",
     "formula1": "F1 赛车",
+    "soccer": "足球",
+    "basketball": "篮球 (NBA)",
 }
 
 DEFAULT_TIMEZONE = "America/Chicago"

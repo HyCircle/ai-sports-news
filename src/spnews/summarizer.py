@@ -55,7 +55,7 @@ def summarize_event(event_name: str, articles: list[dict],
     if previous_coverage:
         memory_hint = (
             f"\n\n此事件此前已有报道，以下是之前的摘要（请基于此写后续进展，"
-            f"避免重复已有内容，可用\"此前报道...\"等衔接语言）：\n{previous_coverage}"
+            f"避免重复已有内容，可用\"此前报道...\"等自然衔接语言）：\n{previous_coverage}"
         )
 
     prompt = f"""你是一个面向双语读者的体育新闻编辑。请根据以下报道总结此事件。
@@ -78,8 +78,12 @@ def generate_overview(sport_summaries: dict[str, str]) -> str:
     for sport_name, content in sport_summaries.items():
         combined += f"### {sport_name}\n{content}\n\n"
 
+    n = len(sport_summaries)
+    n_min = max(n, 5)
+    n_max = n * 2
+
     prompt = f"""你是体育新闻编辑。以下是今日各运动的新闻汇总。
-请输出 3-5 条 bullet point 摘要，每条一句话，概括最值得关注的事件。
+请输出 {n_min}-{n_max} 条 bullet point 摘要，每条一句话，每种运动至少覆盖 1 条，概括最值得关注的事件。
 
 {combined}
 
