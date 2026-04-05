@@ -18,7 +18,7 @@ def main():
     parser.add_argument(
         "-s", "--sports",
         nargs="+",
-        choices=["baseball", "football", "formula1"],
+        choices=["baseball", "football", "formula1", "soccer", "basketball"],
         default=None,
         help="Sports to include (default: all)",
     )

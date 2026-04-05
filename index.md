@@ -7,7 +7,7 @@
 
 ---
 
-**支持运动**: NFL | MLB | F1  
+**支持运动**: NFL | MLB | F1 | 足球 | NBA  
 **技术栈**: Python 3.12+ · uv · feedparser · LLM API
 
 ---

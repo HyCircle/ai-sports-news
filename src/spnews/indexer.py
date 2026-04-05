@@ -31,6 +31,10 @@ def _sport_coverage(report_path: Path) -> str:
         sports.append("NFL")
     if "## F1 赛车" in text:
         sports.append("F1")
+    if "## 足球" in text:
+        sports.append("足球")
+    if "## 篮球 (NBA)" in text:
+        sports.append("NBA")
     return " · ".join(sports) if sports else "-"
 
 

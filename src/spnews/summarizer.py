@@ -15,7 +15,7 @@ _STYLE_GUIDE = """\
 - 仅对核心数据（比分、金额、合同年限、排名、伤病时间等）用 **加粗**；年份(2026等)、序数词(第一/首次等)、日期不加粗
 - 如涉及多笔签约/交易，用列表而非长段落
 - 严禁编造报道中没有的信息，不得推测报道未提及的后续影响或假设性场景
-- 禁止为凑篇幅而重复已述内容——信息量不足时宁可写短"""
+- 禁止为凑篇幅而重复已述内容——但须确保至少覆盖事件的核心事实，不要仅因来源数量少就省略关键信息"""
 
 
 def summarize_event(event_name: str, articles: list[dict],
@@ -38,11 +38,14 @@ def summarize_event(event_name: str, articles: list[dict],
         elif n_sources >= 2:
             detail = "请写 1-2 段总结核心事实与背景，不要凑段数。"
         else:
-            detail = "信息来源有限，请用 1 段准确总结核心内容，不要推测。"
+            detail = "信息来源有限，请用 1 段（至少 3-4 句）准确总结核心内容，不要推测。"
     elif importance == "medium":
-        detail = "请用 1 段话简要总结核心内容。"
+        if n_sources >= 3:
+            detail = "请写 1 段（3-5 句）总结核心事实与背景，可体现不同来源的角度。"
+        else:
+            detail = "请写 1 段（2-4 句）概述核心事实与背景，不要推测。"
     else:
-        detail = "请用 1-2 句话概述。"
+        detail = "请用 2-3 句话概述核心内容。"
 
     date_hint = ""
     if report_date:
