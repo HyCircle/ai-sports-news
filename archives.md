@@ -11,6 +11,7 @@
 	</thead>
 	<tbody>
 <!-- ARCHIVE_LIST_START -->
+<tr><td><a href="output/2026-04-21_sports_daily.html">2026-04-21</a></td><td>MLB · NFL · F1 · 足球 · NBA</td></tr>
 <tr><td><a href="output/2026-04-20_sports_daily.html">2026-04-20</a></td><td>MLB · NFL · F1 · 足球 · NBA</td></tr>
 <tr><td><a href="output/2026-04-19_sports_daily.html">2026-04-19</a></td><td>MLB · NFL · F1 · 足球 · NBA</td></tr>
 <tr><td><a href="output/2026-04-07_sports_daily.html">2026-04-07</a></td><td>MLB · NFL · F1 · 足球 · NBA</td></tr>
