@@ -1,6 +1,11 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(_PROJECT_ROOT / ".env")
+
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8070/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen3.5-27B-Q4:Instruct")
 LLM_API_KEY = os.getenv("LLM_API_KEY")

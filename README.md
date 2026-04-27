@@ -74,7 +74,30 @@ ai-sports-news/
 uv sync
 ```
 
-1. 设置环境变量并运行
+1. 推荐：在项目根目录创建 `.env`
+
+可直接参考 [.env.example](.env.example)：
+
+```dotenv
+LLM_BASE_URL=http://localhost:8080/v1
+LLM_MODEL=your-model-name
+# LLM_API_KEY=your-api-key
+# SPNEWS_DB=spnews.db
+```
+
+然后直接运行：
+
+```bash
+uv run spnews
+```
+
+说明：
+
+- 程序启动时会自动读取项目根目录的 `.env`
+- 已经存在的 shell 环境变量优先级更高，会覆盖 `.env` 中的同名配置
+- `.env` 已在 [.gitignore](.gitignore) 中忽略，不会默认提交到仓库
+
+1. 也可以继续手动设置环境变量后运行
 
 项目统一使用 OpenAI-compatible Chat Completions 接口。无论是本地的 llama.cpp / vLLM / LM Studio，还是 DeepSeek 这类云端服务，都只需要配置 `LLM_BASE_URL`、`LLM_MODEL`，并在需要时提供 `LLM_API_KEY`。
 
@@ -147,6 +170,7 @@ uv run spnews
 - LLM_BASE_URL: LLM API 地址（默认 [http://localhost:8070/v1](http://localhost:8070/v1)）
 - LLM_MODEL: 模型名称（默认 Qwen3.5-27B-Q4:Instruct）
 - LLM_API_KEY: OpenAI-compatible API Key（本地模型通常不需要）
+- SPNEWS_DB: 数据库文件路径（默认 `spnews.db`）
 
 代码内配置（[src/spnews/config.py](src/spnews/config.py)）:
 
@@ -159,6 +183,7 @@ uv run spnews
 - 所有模型服务统一使用标准 Chat Completions 请求体
 - 设置了 `LLM_API_KEY` 时会自动附带 `Authorization: Bearer ...`，未设置时则不发送鉴权头，便于直连本地服务
 - `LLM_BASE_URL` 可以填写到服务根路径或 `/v1`，程序会自动补全 `/chat/completions`
+- 项目启动时会自动读取根目录 `.env`，但不会覆盖已经存在的系统环境变量
 
 ## CLI 用法
 
