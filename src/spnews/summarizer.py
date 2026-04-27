@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from .llm import chat
 
-from .config import REASON_LIMIT
-
 _STYLE_GUIDE = """\
 写作风格要求：
 - 以中文为主体撰写，保持客观新闻风格
@@ -72,7 +70,7 @@ def summarize_event(event_name: str, articles: list[dict],
 {_STYLE_GUIDE}
 不要输出标题，直接输出正文。"""
 
-    return chat(prompt, reasoning_limit=REASON_LIMIT)
+    return chat(prompt)
 
 
 def generate_overview(sport_summaries: dict[str, str]) -> str:
@@ -93,7 +91,7 @@ def generate_overview(sport_summaries: dict[str, str]) -> str:
 {_STYLE_GUIDE}
 格式：直接输出 markdown 无序列表（- 开头），不要加标题或前缀。"""
 
-    return chat(prompt, reasoning_limit=REASON_LIMIT)
+    return chat(prompt)
 
 
 

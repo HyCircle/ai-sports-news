@@ -1,6 +1,6 @@
 # ai-sports-news
 
-轻量级体育资讯自动化工具：抓取 RSS 新闻，通过 SQLite 数据库去重与状态管理，按事件聚类，调用本地 LLM 生成中文 Markdown 日报，并自动维护 GitHub Pages 首页与归档列表。
+轻量级体育资讯自动化工具：抓取 RSS 新闻，通过 SQLite 数据库去重与状态管理，按事件聚类，调用 OpenAI-compatible LLM 接口生成中文 Markdown 日报，并自动维护 GitHub Pages 首页与归档列表。
 
 日报首页: [https://hycircle.github.io/ai-sports-news/](https://hycircle.github.io/ai-sports-news/)
 
@@ -76,6 +76,10 @@ uv sync
 
 1. 设置环境变量并运行
 
+项目统一使用 OpenAI-compatible Chat Completions 接口。无论是本地的 llama.cpp / vLLM / LM Studio，还是 DeepSeek 这类云端服务，都只需要配置 `LLM_BASE_URL`、`LLM_MODEL`，并在需要时提供 `LLM_API_KEY`。
+
+本地模型服务（例如 llama.cpp）：
+
 macOS/Linux:
 
 ```bash
@@ -100,6 +104,37 @@ set LLM_MODEL=your-model-name
 uv run spnews
 ```
 
+DeepSeek API:
+
+macOS/Linux:
+
+```bash
+export LLM_BASE_URL="https://api.deepseek.com"
+export LLM_MODEL="deepseek-v4-flash"
+export LLM_API_KEY="your-deepseek-api-key"
+uv run spnews
+```
+
+Windows PowerShell:
+
+```powershell
+$env:LLM_BASE_URL="https://api.deepseek.com"
+$env:LLM_MODEL="deepseek-v4-flash"
+$env:LLM_API_KEY="your-deepseek-api-key"
+uv run spnews
+```
+
+Windows CMD:
+
+```cmd
+set LLM_BASE_URL=https://api.deepseek.com
+set LLM_MODEL=deepseek-v4-flash
+set LLM_API_KEY=your-deepseek-api-key
+uv run spnews
+```
+
+其他 OpenAI-compatible 服务同样只需要按服务商要求填写 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`。
+
 运行完成后:
 
 - 生成或更新 output/YYYY-MM-DD_sports_daily.md
@@ -111,13 +146,19 @@ uv run spnews
 
 - LLM_BASE_URL: LLM API 地址（默认 [http://localhost:8070/v1](http://localhost:8070/v1)）
 - LLM_MODEL: 模型名称（默认 Qwen3.5-27B-Q4:Instruct）
+- LLM_API_KEY: OpenAI-compatible API Key（本地模型通常不需要）
 
 代码内配置（[src/spnews/config.py](src/spnews/config.py)）:
 
 - RSS_SOURCES: 各运动 RSS 源
 - DEFAULT_TIMEZONE: 默认时区（当前为 America/Chicago）
 - DB_PATH: 数据库文件路径（默认 `spnews.db`，可通过 `SPNEWS_DB` 环境变量覆盖）
-- REASON_LIMIT: LLM 推理预算参数
+
+说明:
+
+- 所有模型服务统一使用标准 Chat Completions 请求体
+- 设置了 `LLM_API_KEY` 时会自动附带 `Authorization: Bearer ...`，未设置时则不发送鉴权头，便于直连本地服务
+- `LLM_BASE_URL` 可以填写到服务根路径或 `/v1`，程序会自动补全 `/chat/completions`
 
 ## CLI 用法
 

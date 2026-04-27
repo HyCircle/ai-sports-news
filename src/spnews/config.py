@@ -3,6 +3,7 @@ from pathlib import Path
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8070/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen3.5-27B-Q4:Instruct")
+LLM_API_KEY = os.getenv("LLM_API_KEY")
 
 DB_PATH = Path(os.getenv("SPNEWS_DB", "spnews.db"))
 
@@ -46,5 +47,3 @@ SPORT_NAMES = {
 DEFAULT_TIMEZONE = "America/Chicago"
 
 RSS_FETCH_DAYS = 7  # Only import RSS entries published within the last N days (0 = no limit)
-
-REASON_LIMIT = -1  # 推理预算限制，单位为 Token，-1:无限制 (default)，0:禁用
