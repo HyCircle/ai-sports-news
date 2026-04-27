@@ -649,7 +649,7 @@ Victor Wembanyama（文班亚马）在因脑震荡缺席圣安东尼奥马刺（
 
 ### 约基奇与兰德尔冲突及罚款
 
-NBA官方于2026年4月26日宣布，丹佛掘金 (Denver Nuggets) 中锋 Nikola Jokic（约基奇）被罚款 **$50,000**，明尼苏达森林狼 (Minnesota Timberwolves) 前锋 Julius Randle（兰德尔）被罚款 **$35,000**，两人均未被禁赛。冲突发生在两队季后赛首轮第四场比赛终场哨响后，起因是森林狼球员 Jaden McDaniels 在胜负已定的情况下完成压哨上篮，引发了 Jokic 的不满并与其发生肢体接触。ESPN 报道指出联盟认定双方均有责任但情节未达到禁赛标准；而 CBS Sports 则引述掘金教练对 McDaniels 此举的批评，称上篮违背了不成文的比赛惯例，McDaniels 本人随后在采访中为此辩护，强调自己只是专注比赛。
+NBA官方于2026年4月26日宣布，丹佛掘金 (Denver Nuggets) 中锋 Nikola Jokic（约基奇）被罚款 **\$50,000**，明尼苏达森林狼 (Minnesota Timberwolves) 前锋 Julius Randle（兰德尔）被罚款 **\$35,000**，两人均未被禁赛。冲突发生在两队季后赛首轮第四场比赛终场哨响后，起因是森林狼球员 Jaden McDaniels 在胜负已定的情况下完成压哨上篮，引发了 Jokic 的不满并与其发生肢体接触。ESPN 报道指出联盟认定双方均有责任但情节未达到禁赛标准；而 CBS Sports 则引述掘金教练对 McDaniels 此举的批评，称上篮违背了不成文的比赛惯例，McDaniels 本人随后在采访中为此辩护，强调自己只是专注比赛。
 
 <details>
 <summary>信息来源(4)</summary>
