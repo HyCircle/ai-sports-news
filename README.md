@@ -196,6 +196,7 @@ uv run spnews [options]
 - -s, --sports: 指定运动，可多选（可选值: baseball football formula1）
 - -o, --output: 自定义输出路径
 - --db: 指定数据库文件路径（默认: spnews.db）
+- --test: 测试模式。使用临时数据库副本运行，不更新真实数据库、首页和归档；仅在显式传入 `-o` 时保存报告
 
 示例:
 
@@ -214,6 +215,12 @@ uv run spnews -s formula1 -o output/f1_daily.md
 
 # 使用自定义数据库
 uv run spnews --db my_data.db
+
+# 测试单项运动，不落盘、不污染数据库和首页索引
+uv run spnews --test -s formula1
+
+# 测试模式下如果想保留输出，需要显式指定 -o
+uv run spnews --test -s formula1 -o debug/test_formula1.md
 ```
 
 ## 报告生成流程
