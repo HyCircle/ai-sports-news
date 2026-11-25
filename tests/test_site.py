@@ -115,10 +115,17 @@ def test_build_site_and_rss_xml(tmp_path: Path):
 
     index_html = (out / "index.html").read_text(encoding="utf-8")
     assert "体育日报" in index_html
+    assert '<link rel="canonical" href="https://sports.yhao.dev/">' in index_html
+    assert 'href="#event-42"' in index_html  # overview bullet & TOC linked to matching event
+    assert 'id="toc-nav"' in index_html
     assert "/reports/2026-11-24/#event-10" in index_html
-    assert (out / "reports" / "2026-11-25" / "index.html").exists()
+
+    day_html = (out / "reports" / "2026-11-25" / "index.html").read_text(encoding="utf-8")
+    assert '<link rel="canonical" href="https://sports.yhao.dev/reports/2026-11-25/">' in day_html
     assert (out / "reports" / "2026-11-24" / "index.html").exists()
-    assert (out / "archives" / "index.html").exists()
+
+    archives_html = (out / "archives" / "index.html").read_text(encoding="utf-8")
+    assert '<link rel="canonical" href="https://sports.yhao.dev/archives/">' in archives_html
     assert (out / "assets" / "style.css").exists()
     assert (out / "assets" / "app.js").exists()
 

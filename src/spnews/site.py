@@ -24,6 +24,83 @@ _STATIC_DIR = _PACKAGE_DIR / "static"
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC_RE = re.compile(r"(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)")
 _LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+_CJK_RUN_RE = re.compile(r"[\u4e00-\u9fff]+")
+_LATIN_WORD_RE = re.compile(r"[a-z0-9]{2,}")
+
+
+def _extract_match_tokens(text: str) -> set[str]:
+    """Extract lowercase ASCII tokens and CJK character bigrams for deterministic matching."""
+    plain = _LINK_RE.sub(r"\1", text or "")
+    plain = plain.replace("**", "").replace("*", "").lower()
+    tokens: set[str] = set(_LATIN_WORD_RE.findall(plain))
+    for run in _CJK_RUN_RE.findall(plain):
+        if len(run) == 1:
+            tokens.add(run)
+        else:
+            for i in range(len(run) - 1):
+                tokens.add(run[i : i + 2])
+    return tokens
+
+
+def _match_overview_bullets(
+    bullets: list[str],
+    sections_view: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Deterministically link each overview bullet to its best matching event anchor."""
+    candidates: list[dict[str, Any]] = []
+    for sec in sections_view:
+        badge = sec.get("badge", "")
+        for ev in sec.get("events", []):
+            candidates.append(
+                {
+                    "anchor": ev["anchor"],
+                    "badge": badge,
+                    "importance": ev.get("importance", "medium"),
+                    "title_tokens": _extract_match_tokens(ev.get("title", "")),
+                    "body_tokens": _extract_match_tokens((ev.get("summary_md") or "")[:360]),
+                }
+            )
+
+    used_anchors: set[str] = set()
+    items: list[dict[str, Any]] = []
+    for bullet in bullets:
+        b_tokens = _extract_match_tokens(bullet)
+        best: dict[str, Any] | None = None
+        best_score = 0.0
+        if b_tokens:
+            for cand in candidates:
+                if cand["anchor"] in used_anchors:
+                    continue
+                t_hits = len(b_tokens & cand["title_tokens"])
+                b_hits = len(b_tokens & cand["body_tokens"])
+                # Title overlap carries higher weight than body overlap
+                title_ratio = t_hits / max(1, min(len(b_tokens), len(cand["title_tokens"])))
+                body_ratio = b_hits / len(b_tokens)
+                score = 0.65 * title_ratio + 0.35 * body_ratio
+                if cand["importance"] == "high":
+                    score += 0.05
+                if score > best_score:
+                    best_score = score
+                    best = cand
+
+        if best is not None and best_score >= 0.25:
+            used_anchors.add(best["anchor"])
+            items.append(
+                {
+                    "html": render_inline_md(bullet),
+                    "anchor": best["anchor"],
+                    "badge": best["badge"],
+                }
+            )
+        else:
+            items.append(
+                {
+                    "html": render_inline_md(bullet),
+                    "anchor": None,
+                    "badge": None,
+                }
+            )
+    return items
 
 
 def render_inline_md(text: str) -> str:
@@ -88,7 +165,8 @@ def _format_rfc822(iso_str: str | None, fallback_date: str) -> str:
 def _prepare_report_view(report_json: dict[str, Any]) -> dict[str, Any]:
     """Enrich a stored report JSON dict with pre-rendered HTML for templates & RSS."""
     view = dict(report_json)
-    view["overview_html"] = [render_inline_md(b) for b in report_json.get("overview_bullets", [])]
+    bullets = report_json.get("overview_bullets", [])
+    view["overview_html"] = [render_inline_md(b) for b in bullets]
     sections_view = []
     for sec in report_json.get("sections", []):
         sec_copy = dict(sec)
@@ -97,10 +175,19 @@ def _prepare_report_view(report_json: dict[str, Any]) -> dict[str, Any]:
             ev_copy = dict(ev)
             ev_copy["anchor"] = f"event-{ev['id']}" if ev.get("id") else f"{sec['sport']}-{idx}"
             ev_copy["summary_html"] = render_summary_html(ev.get("summary_md", ""))
+            ev_copy["search_blob"] = " ".join(
+                [
+                    ev.get("title", ""),
+                    ev.get("summary_md", ""),
+                    sec.get("badge", ""),
+                    sec.get("sport_name", ""),
+                ]
+            ).lower()
             events_view.append(ev_copy)
         sec_copy["events"] = events_view
         sections_view.append(sec_copy)
     view["sections"] = sections_view
+    view["overview_items"] = _match_overview_bullets(bullets, sections_view)
     view["pub_rfc822"] = _format_rfc822(
         report_json.get("generated_at"), report_json["report_date"]
     )
@@ -158,6 +245,7 @@ def build_site_from_reports(
         day_dir.mkdir(parents=True, exist_ok=True)
         day_html = report_tpl.render(
             site_url=site_url,
+            canonical_url=f"{site_url}/reports/{rdate}/",
             report=view,
             is_home=False,
             prev_date=prev_date,
@@ -196,6 +284,7 @@ def build_site_from_reports(
     if views:
         home_html = report_tpl.render(
             site_url=site_url,
+            canonical_url=f"{site_url}/",
             report=views[0],
             is_home=True,
             prev_date=views[1]["report_date"] if len(views) > 1 else None,
@@ -210,6 +299,7 @@ def build_site_from_reports(
     else:
         home_html = report_tpl.render(
             site_url=site_url,
+            canonical_url=f"{site_url}/",
             report=None,
             is_home=True,
             prev_date=None,
@@ -224,6 +314,7 @@ def build_site_from_reports(
     archives_dir.mkdir(parents=True, exist_ok=True)
     archives_html = archives_tpl.render(
         site_url=site_url,
+        canonical_url=f"{site_url}/archives/",
         months=list(months.items()),
         total_reports=len(views),
         page_title="历史归档 · spnews",
