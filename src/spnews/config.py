@@ -1,54 +1,83 @@
-import os
+"""Application configuration via environment variables (.env supported)."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-from dotenv import load_dotenv
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(_PROJECT_ROOT / ".env")
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8070/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "Qwen3.5-27B-Q4:Instruct")
-LLM_API_KEY = os.getenv("LLM_API_KEY")
 
-DB_PATH = Path(os.getenv("SPNEWS_DB", "spnews.db"))
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=_PROJECT_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-RSS_SOURCES = {
-    "baseball": [
-        "https://www.espn.com/espn/rss/mlb/news",
-        "https://www.mlb.com/feeds/news/rss.xml",
-        "https://www.cbssports.com/rss/headlines/mlb/",
-    ],
-    "football": [
-        "https://www.espn.com/espn/rss/nfl/news",
-        "https://www.cbssports.com/rss/headlines/nfl/",
-        "https://profootballtalk.nbcsports.com/feed/",
-    ],
-    "formula1": [
-        "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
-        "https://www.skysports.com/rss/12433",
-        "https://the-race.com/feed/",
-    ],
-    "soccer": [
-        "https://www.espn.com/espn/rss/soccer/news",
-        "https://feeds.bbci.co.uk/sport/football/rss.xml",
-        "https://www.skysports.com/rss/12040",
-        "https://www.cbssports.com/rss/headlines/soccer/",
-    ],
-    "basketball": [
-        "https://www.espn.com/espn/rss/nba/news",
-        "https://www.cbssports.com/rss/headlines/nba/",
-        "https://bleacherreport.com/nba.rss",
-    ],
-}
+    # PostgreSQL 18 + pgvector
+    spnews_database_url: str = Field(
+        default="postgresql://spnews@127.0.0.1:5432/spnews",
+        alias="SPNEWS_DATABASE_URL",
+    )
 
-SPORT_NAMES = {
-    "baseball": "棒球 (MLB)",
-    "football": "橄榄球 (NFL)",
-    "formula1": "F1 赛车",
-    "soccer": "足球",
-    "basketball": "篮球 (NBA)",
-}
+    # Chat LLM (OpenAI-compatible)
+    llm_base_url: str = Field(default="https://api.deepseek.com", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="deepseek-flash", alias="LLM_MODEL")
+    llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
+    deepseek_api_key: str | None = Field(default=None, alias="DEEPSEEK_API_KEY")
+    openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
 
-DEFAULT_TIMEZONE = "America/Chicago"
+    # Embedding API (OpenRouter qwen/qwen3-embedding-8b -> MRL 1024d)
+    embed_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", alias="EMBED_BASE_URL"
+    )
+    embed_model: str = Field(
+        default="qwen/qwen3-embedding-8b", alias="EMBED_MODEL"
+    )
+    embed_api_key: str | None = Field(default=None, alias="EMBED_API_KEY")
+    embed_dim: int = Field(default=1024, alias="EMBED_DIM")
 
-RSS_FETCH_DAYS = 7  # Only import RSS entries published within the last N days (0 = no limit)
+    # Pipeline tuning
+    timezone: str = Field(default="America/Chicago", alias="TIMEZONE")
+    site_url: str = Field(default="https://sports.yhao.dev", alias="SITE_URL")
+    rss_fetch_days: int = Field(default=7, alias="RSS_FETCH_DAYS")
+    memory_days: int = Field(default=14, alias="MEMORY_DAYS")
+    micro_cluster_threshold: float = Field(default=0.72, alias="MICRO_CLUSTER_THRESHOLD")
+    memory_sim_threshold: float = Field(default=0.55, alias="MEMORY_SIM_THRESHOLD")
+    max_events_per_sport: int = Field(default=12, alias="MAX_EVENTS_PER_SPORT")
+    max_enrich_per_event: int = Field(default=3, alias="MAX_ENRICH_PER_EVENT")
+    llm_concurrency: int = Field(default=6, alias="LLM_CONCURRENCY")
+    http_concurrency: int = Field(default=10, alias="HTTP_CONCURRENCY")
+
+    def resolved_llm_api_key(self) -> str:
+        """Select API key matching the configured LLM_BASE_URL."""
+        base = self.llm_base_url.lower()
+        if "openrouter.ai" in base:
+            key = self.openrouter_api_key or self.llm_api_key
+        elif "deepseek.com" in base:
+            key = self.deepseek_api_key or self.llm_api_key
+        else:
+            key = self.llm_api_key or self.deepseek_api_key or self.openrouter_api_key
+        if not key:
+            raise ValueError(
+                f"Missing API key for LLM_BASE_URL={self.llm_base_url}. "
+                "Set LLM_API_KEY, DEEPSEEK_API_KEY, or OPENROUTER_API_KEY in .env."
+            )
+        return key
+
+    def resolved_embed_api_key(self) -> str:
+        """Select API key for the embedding endpoint."""
+        key = self.embed_api_key or self.openrouter_api_key
+        if not key:
+            raise ValueError(
+                f"Missing API key for EMBED_BASE_URL={self.embed_base_url}. "
+                "Set EMBED_API_KEY or OPENROUTER_API_KEY in .env."
+            )
+        return key
+
+
+def get_settings() -> Settings:
+    return Settings()

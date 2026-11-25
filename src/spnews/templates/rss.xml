@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>spnews · 体育日报</title>
+    <link>{{ site_url }}/</link>
+    <description>每日自动聚合 MLB、NFL、F1、足球、NBA 核心体育新闻中文摘要</description>
+    <language>zh-CN</language>
+    <lastBuildDate>{{ build_date }}</lastBuildDate>
+    <atom:link href="{{ site_url }}/rss.xml" rel="self" type="application/rss+xml"/>
+    {% for report in reports %}
+    <item>
+      <title>体育日报 {{ report.report_date }}</title>
+      <link>{{ site_url }}/reports/{{ report.report_date }}/</link>
+      <guid isPermaLink="true">{{ site_url }}/reports/{{ report.report_date }}/</guid>
+      <pubDate>{{ report.pub_rfc822 }}</pubDate>
+      <description><![CDATA[
+        {% if report.overview_html %}
+        <h2>今日要点</h2>
+        <ul>
+          {% for b in report.overview_html %}<li>{{ b | safe }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% for sec in report.sections %}
+        <h2>{{ sec.sport_name }}</h2>
+          {% for ev in sec.events %}
+          <h3>{% if ev.importance == 'high' %}[重大] {% endif %}{{ ev.title }}</h3>
+          {{ ev.summary_html | safe }}
+          {% if ev.sources %}
+          <p><small>来源：{% for s in ev.sources %}<a href="{{ s.url }}">{{ s.source_name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</small></p>
+          {% endif %}
+          {% endfor %}
+        {% endfor %}
+      ]]></description>
+    </item>
+    {% endfor %}
+  </channel>
+</rss>

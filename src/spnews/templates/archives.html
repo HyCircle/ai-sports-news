@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% set active_nav = 'archives' %}
+
+{% block content %}
+<section class="issue-header">
+  <h1 class="issue-title">历史日报归档</h1>
+  <p class="muted">共收录 {{ total_reports }} 期日报，支持按日期、运动或事件关键词实时过滤。</p>
+  <div class="search-wrap">
+    <input
+      type="search"
+      id="archive-search"
+      class="search-input"
+      placeholder="搜索日期、球队、球星或运动（如 F1、Lakers、2026-11）..."
+      autocomplete="off"
+    >
+  </div>
+</section>
+
+{% if not months %}
+  <p class="muted">暂无归档记录。</p>
+{% else %}
+  <div id="archive-groups">
+    {% for month, items in months %}
+    <section class="archive-month" data-month="{{ month }}">
+      <h2 class="month-heading mono">{{ month }}</h2>
+      <ul class="archive-list">
+        {% for item in items %}
+        <li class="archive-item" data-search="{{ item.search_blob }}">
+          <a class="archive-link" href="{{ item.url }}">
+            <div class="archive-row-top">
+              <time class="archive-date mono">{{ item.report_date }}</time>
+              <div class="archive-badges">
+                {% for b in item.badges %}
+                  <span class="mini-badge">{{ b }}</span>
+                {% endfor %}
+                <span class="muted mono">{{ item.event_count }} 条</span>
+              </div>
+            </div>
+            {% if item.lead %}
+              <p class="archive-lead">{{ item.lead }}</p>
+            {% endif %}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </div>
+  <p id="archive-empty" class="muted" hidden>没有匹配的历史日报。</p>
+{% endif %}
+{% endblock %}
