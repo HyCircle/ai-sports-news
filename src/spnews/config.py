@@ -40,9 +40,12 @@ class Settings(BaseSettings):
     embed_api_key: str | None = Field(default=None, alias="EMBED_API_KEY")
     embed_dim: int = Field(default=1024, alias="EMBED_DIM")
 
-    # Pipeline tuning
+    # Site & timezone
     timezone: str = Field(default="America/Chicago", alias="TIMEZONE")
     site_url: str = Field(default="https://sports.yhao.dev", alias="SITE_URL")
+    cloudflare_api_token: str | None = Field(default=None, alias="CLOUDFLARE_API_TOKEN")
+    cloudflare_account_id: str | None = Field(default=None, alias="CLOUDFLARE_ACCOUNT_ID")
+    cf_pages_project: str = Field(default="spnews", alias="CF_PAGES_PROJECT")
     rss_fetch_days: int = Field(default=7, alias="RSS_FETCH_DAYS")
     memory_days: int = Field(default=14, alias="MEMORY_DAYS")
     micro_cluster_threshold: float = Field(default=0.72, alias="MICRO_CLUSTER_THRESHOLD")

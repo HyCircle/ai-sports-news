@@ -6,11 +6,12 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-from .config import get_settings
+from .config import Settings, get_settings
 from .db import dumps_json, get_status_summary, init_db
 from .pipeline import run_full_pipeline, run_generate, run_ingest_and_embed
 from .site import build_site, build_site_from_reports
@@ -40,9 +41,15 @@ def _add_sports_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _deploy_cf_pages(dist_dir: Path, project_name: str) -> None:
+def _deploy_cf_pages(dist_dir: Path, project_name: str, settings: Settings) -> None:
+    env = os.environ.copy()
+    if settings.cloudflare_api_token:
+        env["CLOUDFLARE_API_TOKEN"] = settings.cloudflare_api_token
+    if settings.cloudflare_account_id:
+        env["CLOUDFLARE_ACCOUNT_ID"] = settings.cloudflare_account_id
     cmd = [
         "npx",
+        "--yes",
         "wrangler",
         "pages",
         "deploy",
@@ -50,7 +57,7 @@ def _deploy_cf_pages(dist_dir: Path, project_name: str) -> None:
         f"--project-name={project_name}",
     ]
     print(f"Deploying to Cloudflare Pages: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, env=env, check=True)
 
 
 def main() -> None:
@@ -85,6 +92,10 @@ def main() -> None:
 
     p_build = sub.add_parser("build", help="Render static site and RSS feed from PostgreSQL")
     p_build.add_argument("-o", "--output-dir", type=str, default="dist", help="Output directory")
+    p_build.add_argument("--deploy", action="store_true", help="Deploy output dir via wrangler pages")
+    p_build.add_argument(
+        "--cf-project", type=str, default=None, help="Cloudflare Pages project name"
+    )
 
     p_run = sub.add_parser("run", help="Full daily pipeline: ingest -> generate -> build")
     _add_sports_arg(p_run)
@@ -93,7 +104,7 @@ def main() -> None:
     p_run.add_argument("-o", "--output-dir", type=str, default="dist", help="Static output directory")
     p_run.add_argument("--deploy", action="store_true", help="Deploy dist/ via wrangler pages")
     p_run.add_argument(
-        "--cf-project", type=str, default="spnews", help="Cloudflare Pages project name"
+        "--cf-project", type=str, default=None, help="Cloudflare Pages project name"
     )
 
     sub.add_parser("status", help="Show database counts and recent runs")
@@ -143,6 +154,12 @@ def main() -> None:
 
     if args.cmd == "build":
         res = build_site(settings, output_dir=Path(args.output_dir))
+        if args.deploy:
+            _deploy_cf_pages(
+                Path(args.output_dir),
+                args.cf_project or settings.cf_pages_project,
+                settings,
+            )
         print(dumps_json(res))
         return
 
@@ -153,7 +170,11 @@ def main() -> None:
         if not args.skip_build and not args.dry_run:
             stats["build"] = build_site(settings, output_dir=Path(args.output_dir))
             if args.deploy:
-                _deploy_cf_pages(Path(args.output_dir), args.cf_project)
+                _deploy_cf_pages(
+                    Path(args.output_dir),
+                    args.cf_project or settings.cf_pages_project,
+                    settings,
+                )
         elif args.dry_run and not args.skip_build:
             stats["preview_build"] = build_site_from_reports(
                 [report_json], output_dir=Path(args.output_dir), site_url=settings.site_url
