@@ -16,7 +16,5 @@ wheels/
 .env
 *.db
 
-# Workflow local artifacts
-.workflow/kit/
-.workflow/scratchpad/
-.workflow/workflow.env
+# Workflow local artifacts (not tracked in git)
+.workflow/

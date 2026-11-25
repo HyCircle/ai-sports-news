@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     max_events_per_sport: int = Field(default=12, alias="MAX_EVENTS_PER_SPORT")
     max_high_per_sport: int = Field(default=3, alias="MAX_HIGH_PER_SPORT")
     max_enrich_per_event: int = Field(default=3, alias="MAX_ENRICH_PER_EVENT")
-    llm_concurrency: int = Field(default=6, alias="LLM_CONCURRENCY")
+    llm_concurrency: int = Field(default=14, alias="LLM_CONCURRENCY")
     http_concurrency: int = Field(default=10, alias="HTTP_CONCURRENCY")
 
     def resolved_llm_api_key(self) -> str:

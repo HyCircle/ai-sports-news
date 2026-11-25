@@ -136,10 +136,11 @@ class ChatClient:
             raise RuntimeError("ChatClient must be used inside 'async with'")
         last_exc: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
-            t0 = time.monotonic()
             try:
                 async with self._sem:
+                    t0 = time.monotonic()
                     resp = await self._client.post(self.url, json=payload)
+                    elapsed = time.monotonic() - t0
                 if resp.status_code in _RETRYABLE_STATUS and attempt < self._max_retries:
                     delay = 1.5 * (2 ** (attempt - 1))
                     logger.warning(
@@ -150,7 +151,7 @@ class ChatClient:
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-                self.usage.record(data.get("usage"), time.monotonic() - t0)
+                self.usage.record(data.get("usage"), elapsed)
                 return data
             except (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError) as exc:
                 last_exc = exc
