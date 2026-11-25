@@ -80,6 +80,12 @@ def main() -> None:
         action="store_true",
         help="Run without committing events/reports or marking articles processed",
     )
+    p_gen.add_argument(
+        "--replay-hours",
+        type=int,
+        default=None,
+        help="Replay recent non-filtered articles within N hours (for dry-run A/B or report refresh)",
+    )
     p_gen.add_argument("--llm-base-url", type=str, default=None, help="Override LLM_BASE_URL")
     p_gen.add_argument("--llm-model", type=str, default=None, help="Override LLM_MODEL")
     p_gen.add_argument("-o", "--output-json", type=str, default=None, help="Write report JSON")
@@ -135,6 +141,7 @@ def main() -> None:
                 settings,
                 sports=args.sports,
                 dry_run=args.dry_run,
+                replay_hours=args.replay_hours,
                 llm_base_url=args.llm_base_url,
                 llm_model=args.llm_model,
             )

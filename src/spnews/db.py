@@ -171,18 +171,62 @@ def save_article_embeddings(dsn: str, items: list[tuple[int, np.ndarray]]) -> No
         )
 
 
-def get_pending_articles(dsn: str, sport: str) -> list[dict[str, Any]]:
-    """Return all pending articles for one sport, newest first."""
+def get_pending_articles(
+    dsn: str,
+    sport: str,
+    lookback_hours: int | None = None,
+) -> list[dict[str, Any]]:
+    """Return pending articles for one sport, newest first, optionally capped by recency."""
+    with connect(dsn) as conn:
+        if lookback_hours is not None and lookback_hours > 0:
+            rows = conn.execute(
+                """
+                SELECT id, canonical_url, sport, source_name, title, summary,
+                       content_from_rss, fetched_body, published_at, embedding
+                FROM articles
+                WHERE sport = %s
+                  AND status = 'pending'
+                  AND (published_at IS NULL OR published_at >= NOW() - (%s * INTERVAL '1 hour'))
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                """,
+                (sport, lookback_hours),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, canonical_url, sport, source_name, title, summary,
+                       content_from_rss, fetched_body, published_at, embedding
+                FROM articles
+                WHERE sport = %s AND status = 'pending'
+                ORDER BY published_at DESC NULLS LAST, id DESC
+                """,
+                (sport,),
+            ).fetchall()
+    for r in rows:
+        emb = r.get("embedding")
+        if emb is not None and hasattr(emb, "to_numpy"):
+            r["embedding"] = emb.to_numpy()
+    return rows
+
+
+def get_recent_articles_for_replay(
+    dsn: str,
+    sport: str,
+    lookback_hours: int = 48,
+) -> list[dict[str, Any]]:
+    """Return recent non-filtered articles (pending/used/ignored) for dry-run or refresh replay."""
     with connect(dsn) as conn:
         rows = conn.execute(
             """
             SELECT id, canonical_url, sport, source_name, title, summary,
                    content_from_rss, fetched_body, published_at, embedding
             FROM articles
-            WHERE sport = %s AND status = 'pending'
+            WHERE sport = %s
+              AND status <> 'filtered'
+              AND (published_at IS NULL OR published_at >= NOW() - (%s * INTERVAL '1 hour'))
             ORDER BY published_at DESC NULLS LAST, id DESC
             """,
-            (sport,),
+            (sport, lookback_hours),
         ).fetchall()
     for r in rows:
         emb = r.get("embedding")
@@ -209,10 +253,36 @@ def search_similar_events(
     days: int = 14,
     limit: int = 3,
     min_similarity: float = 0.55,
+    exclude_report_date: str | None = None,
 ) -> list[dict[str, Any]]:
     """Find top-K recent events for the same sport by cosine similarity."""
     max_dist = 1.0 - min_similarity
     with connect(dsn) as conn:
+        if exclude_report_date:
+            return conn.execute(
+                """
+                SELECT id, report_date, title, importance, summary_md,
+                       1.0 - (embedding <=> %s) AS similarity
+                FROM events
+                WHERE sport = %s
+                  AND embedding IS NOT NULL
+                  AND report_date >= CURRENT_DATE - (%s * INTERVAL '1 day')
+                  AND report_date <> %s::date
+                  AND (embedding <=> %s) <= %s
+                ORDER BY embedding <=> %s ASC
+                LIMIT %s
+                """,
+                (
+                    query_vec,
+                    sport,
+                    days,
+                    exclude_report_date,
+                    query_vec,
+                    max_dist,
+                    query_vec,
+                    limit,
+                ),
+            ).fetchall()
         return conn.execute(
             """
             SELECT id, report_date, title, importance, summary_md,

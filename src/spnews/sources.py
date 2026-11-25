@@ -80,7 +80,11 @@ _BETTING_URL_RE = re.compile(
     re.IGNORECASE,
 )
 _BETTING_TITLE_RE = re.compile(
-    r"\b(best bets?|prop bets?|prop picks?|betting odds|odds,? picks?|dfs picks?|fantasy (basketball|football|baseball|soccer)|sportsline|parlay|how to watch|promo code|save \d+%)\b",
+    r"\b(best bets?|prop bets?|prop picks?|betting odds|odds,? picks?|dfs picks?|fantasy (basketball|football|baseball|soccer|impact|rankings?|outlook)|sportsline|parlay|how to watch|promo code|save \d+%)\b",
+    re.IGNORECASE,
+)
+_PREDICTION_TITLE_RE = re.compile(
+    r"(\bvs\.?\b.*\b(predictions?|picks?|odds)\b|\b(predictions?|picks)\s*[:|-]|\bexpert picks\b|\bpower rankings?\b|\bbracket predictions?\b|\ball-star picks\b)",
     re.IGNORECASE,
 )
 _VIDEO_URL_RE = re.compile(
@@ -131,6 +135,8 @@ def classify_noise(url: str, title: str) -> str | None:
         return "podcast"
     if _BETTING_URL_RE.search(url) or _BETTING_TITLE_RE.search(title):
         return "betting_or_promo"
+    if _PREDICTION_TITLE_RE.search(title):
+        return "prediction_or_rankings"
     if _LIVE_BLOG_URL_RE.search(url):
         return "live_blog"
     return None

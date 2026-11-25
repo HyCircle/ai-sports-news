@@ -26,42 +26,94 @@ _ESPN_STORY_ID_RE = re.compile(r"espn\.com/[^?]+?/(?:story|preview)/_/id/(\d+)",
 _MIN_BODY_CHARS = 300
 _MAX_BODY_CHARS = 4000
 
+_PROMO_LINE_RE = re.compile(
+    r"(?i)^\s*[-•*]?\s*(?:"
+    r"got sky\?|"
+    r"no sky\?|"
+    r"watch (?:every|the|live|premier league|f1).*sky sports|"
+    r"stream .*with now|"
+    r"download the sky sports app|"
+    r".*news\s*&\s*transfers.*fixtures\s*&\s*scores|"
+    r"sign up for .*newsletter|"
+    r"subscribe to .*podcast"
+    r")"
+)
+_INLINE_SKY_PROMO_RE = re.compile(
+    r";\s*watch (?:every|the|all|live)[^.\n]*?sky sports[^.\n]*",
+    re.IGNORECASE,
+)
+
+
+def clean_extracted_body(text: str) -> str:
+    """Deterministically strip broadcast promo lines and TV ads from extracted article text."""
+    if not text:
+        return ""
+    cleaned_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = _INLINE_SKY_PROMO_RE.sub("", raw_line).strip()
+        if not line:
+            cleaned_lines.append("")
+            continue
+        if _PROMO_LINE_RE.search(line):
+            continue
+        cleaned_lines.append(line)
+    joined = "\n".join(cleaned_lines)
+    return re.sub(r"\n{3,}", "\n\n", joined).strip()
+
+
+def _pub_sort_key(art: dict[str, Any]) -> float:
+    dt = art.get("published_at")
+    return dt.timestamp() if dt is not None else 0.0
+
 
 def _pick_representative_articles(
     articles: list[dict[str, Any]],
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Select up to *limit* articles preferring distinct sources and richer snippets."""
+    """Select up to *limit* articles: newest first, then distinct sources with richest text."""
+    if not articles or limit <= 0:
+        return []
+
     selected: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
     seen_sources: set[str] = set()
 
-    # Pass 1: one article per distinct source (prioritize those with existing content/summary)
+    # Pass 0: always include the newest article so breaking updates are never missed
+    newest = max(articles, key=_pub_sort_key)
+    selected.append(newest)
+    seen_ids.add(int(newest["id"]))
+    seen_sources.add(newest.get("source_name") or "")
+
+    # Pass 1: one article per distinct source (preferring richer text + recency)
     ranked = sorted(
         articles,
         key=lambda a: (
             len(a.get("fetched_body") or "") > 0,
             len(a.get("content_from_rss") or "") >= _MIN_BODY_CHARS,
             len(a.get("summary") or ""),
+            _pub_sort_key(a),
         ),
         reverse=True,
     )
     for art in ranked:
         if len(selected) >= limit:
             break
+        aid = int(art["id"])
         src = art.get("source_name") or ""
-        if src not in seen_sources:
+        if aid not in seen_ids and src not in seen_sources:
+            seen_ids.add(aid)
             seen_sources.add(src)
             selected.append(art)
 
     # Pass 2: fill remaining slots if cluster has fewer distinct sources than limit
     if len(selected) < limit:
-        selected_ids = {a["id"] for a in selected}
         for art in ranked:
             if len(selected) >= limit:
                 break
-            if art["id"] not in selected_ids:
+            aid = int(art["id"])
+            if aid not in seen_ids:
                 selected.append(art)
-                selected_ids.add(art["id"])
+                seen_ids.add(aid)
     return selected
 
 
@@ -110,10 +162,10 @@ async def _fetch_one(
 
     # Fast path 1: already cached in DB
     if art.get("fetched_body"):
-        return aid, art["fetched_body"][:_MAX_BODY_CHARS], "cached"
+        return aid, clean_extracted_body(art["fetched_body"])[:_MAX_BODY_CHARS], "cached"
 
     # Fast path 2: RSS feed already included full content (e.g. PFT, The Race)
-    rss_content = (art.get("content_from_rss") or "").strip()
+    rss_content = clean_extracted_body((art.get("content_from_rss") or "").strip())
     if len(rss_content) >= _MIN_BODY_CHARS:
         return aid, rss_content[:_MAX_BODY_CHARS], "rss_content"
 
@@ -123,7 +175,7 @@ async def _fetch_one(
         if m:
             espn_body = await _fetch_espn_api(client, m.group(1))
             if espn_body:
-                return aid, espn_body, "espn_api"
+                return aid, clean_extracted_body(espn_body)[:_MAX_BODY_CHARS], "espn_api"
 
         # General path: HTTP GET + trafilatura main-text extraction
         try:
@@ -133,7 +185,7 @@ async def _fetch_one(
                 return aid, None, "failed"
             body = await asyncio.to_thread(_extract_trafilatura, resp.text, url)
             if body:
-                return aid, body, "trafilatura"
+                return aid, clean_extracted_body(body)[:_MAX_BODY_CHARS], "trafilatura"
             logger.info("Trafilatura extracted insufficient text for %s", url)
             return aid, None, "failed"
         except (httpx.HTTPError, ValueError, RuntimeError) as exc:

@@ -54,6 +54,20 @@ def test_classify_noise_catches_real_spam_patterns():
         )
         == "live_blog"
     )
+    assert (
+        classify_noise(
+            "https://www.cbssports.com/nfl/news/rams-vs-packers-prediction/",
+            "Rams vs. Packers prediction: Can Green Bay keep winning?",
+        )
+        == "prediction_or_rankings"
+    )
+    assert (
+        classify_noise(
+            "https://www.espn.com/nfl/story/_/id/12345/nfl-power-rankings-week-12",
+            "Power Rankings: Best and worst teams after 11 weeks",
+        )
+        == "prediction_or_rankings"
+    )
 
 
 def test_classify_noise_keeps_real_news():

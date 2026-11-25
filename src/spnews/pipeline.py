@@ -14,6 +14,7 @@ from .db import (
     commit_report_run,
     finish_run,
     get_pending_articles,
+    get_recent_articles_for_replay,
     init_db,
     start_run,
 )
@@ -21,7 +22,7 @@ from .embed import embed_pending_articles, format_event_for_embed
 from .enrich import enrich_clusters
 from .ingest import ingest_sports
 from .llm import ChatClient, EmbedClient
-from .sources import ALL_SPORT_KEYS, SPORT_MAP
+from .sources import ALL_SPORT_KEYS, SPORT_MAP, classify_noise
 from .summarize import build_calendar_reference, generate_overview, summarize_sport_clusters
 
 logger = logging.getLogger("spnews.pipeline")
@@ -56,13 +57,15 @@ async def run_generate(
     sports: list[str] | None = None,
     *,
     dry_run: bool = False,
+    replay_hours: int | None = None,
     llm_base_url: str | None = None,
     llm_model: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Stage 2b + Stage 3: hybrid cluster, on-demand enrich, summarize, and optionally commit.
 
-    In dry_run mode, reads pending articles from PostgreSQL and builds the full
-    structured report without marking articles done or saving to events/reports.
+    In dry_run mode, builds the full structured report without mutating DB state.
+    When *replay_hours* is set, loads recent non-filtered articles (including previously
+    processed ones) within that lookback window and re-applies deterministic noise filtering.
     """
     target_sports = list(sports) if sports else list(ALL_SPORT_KEYS)
     effective_base = llm_base_url or settings.llm_base_url
@@ -78,13 +81,30 @@ async def run_generate(
 
     pending_by_sport: dict[str, list[dict[str, Any]]] = {}
     for sport in target_sports:
-        pending_by_sport[sport] = await asyncio.to_thread(
-            get_pending_articles, effective_settings.spnews_database_url, sport
-        )
+        if replay_hours is not None:
+            raw_rows = await asyncio.to_thread(
+                get_recent_articles_for_replay,
+                effective_settings.spnews_database_url,
+                sport,
+                replay_hours,
+            )
+            pending_by_sport[sport] = [
+                r
+                for r in raw_rows
+                if classify_noise(r["canonical_url"], r["title"]) is None
+            ]
+        else:
+            pending_by_sport[sport] = await asyncio.to_thread(
+                get_pending_articles,
+                effective_settings.spnews_database_url,
+                sport,
+                effective_settings.report_lookback_hours,
+            )
 
     stats: dict[str, Any] = {
         "report_date": report_date,
         "dry_run": dry_run,
+        "replay_hours": replay_hours,
         "llm_model": effective_model,
         "llm_base_url": effective_base,
         "cluster_by_sport": {},
@@ -104,7 +124,13 @@ async def run_generate(
                 return sport, [], {"pending": 0, "micro_clusters": 0, "memory_hits": 0, "final_events": 0}
             meta = SPORT_MAP[sport]
             clusters, c_stats = await cluster_sport_articles(
-                effective_settings, chat_client, sport, meta.name, arts
+                effective_settings,
+                chat_client,
+                sport,
+                meta.name,
+                arts,
+                report_date=report_date,
+                tz=tz,
             )
             return sport, clusters, c_stats
 
@@ -122,8 +148,8 @@ async def run_generate(
             effective_settings, all_clusters, persist_cache=True
         )
 
-        # 3. Concurrent event summarization across all sports
-        async def _summarize_sport(sport: str) -> tuple[str, list[str]]:
+        # 3. Concurrent structured event summarization across all sports
+        async def _summarize_sport(sport: str) -> tuple[str, list[tuple[str, str]]]:
             clusters = clusters_by_sport[sport]
             summaries = await summarize_sport_clusters(chat_client, clusters, calendar_ref, tz)
             return sport, summaries
@@ -144,7 +170,7 @@ async def run_generate(
             sport_used_ids: set[int] = set()
 
             event_items: list[dict[str, Any]] = []
-            for cluster, summary_md in zip(clusters, summaries, strict=True):
+            for cluster, (final_title, summary_md) in zip(clusters, summaries, strict=True):
                 art_ids = [int(a["id"]) for a in cluster.articles]
                 sport_used_ids.update(art_ids)
                 used_article_ids.update(art_ids)
@@ -180,7 +206,7 @@ async def run_generate(
                 event_items.append(
                     {
                         "id": None,
-                        "title": cluster.title,
+                        "title": final_title,
                         "importance": cluster.importance,
                         "summary_md": summary_md,
                         "parent_event": parent_ref,
@@ -190,7 +216,7 @@ async def run_generate(
                 events_to_save.append(
                     {
                         "sport": sport,
-                        "title": cluster.title,
+                        "title": final_title,
                         "importance": cluster.importance,
                         "summary_md": summary_md,
                         "article_ids": art_ids,

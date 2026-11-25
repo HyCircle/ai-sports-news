@@ -7,7 +7,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from spnews.site import build_site_from_reports, render_summary_html
-from spnews.summarize import build_calendar_reference
+from spnews.summarize import (
+    EventSummaryOutput,
+    build_calendar_reference,
+    find_factual_glitches,
+    normalize_summary_text,
+)
 
 
 def test_calendar_reference_exact_weekdays():
@@ -16,6 +21,33 @@ def test_calendar_reference_exact_weekdays():
     assert "2026-11-25（周三，今天）" in cal
     assert "2026-11-24（周二，昨天）" in cal
     assert "2026-11-23（周一，2天前）" in cal
+
+
+def test_summary_normalization_and_glitch_detection():
+    assert normalize_summary_text('在 11 月 22 日签下 $1.2亿合同，称 "完全无意义"。') == (
+        "在 11月22日签下 1.2亿美元合同，称 “完全无意义”。"
+    )
+    glitches = find_factual_glitches("哈登全场 15投26中，素材显示他状态火热。")
+    assert len(glitches) == 2
+    assert any("26投15中" in g for g in glitches)
+    assert any("素材显示" in g for g in glitches)
+    assert find_factual_glitches("哈登全场 26投15中、14罚14中。") == []
+
+
+def test_event_summary_output_to_markdown():
+    out = EventSummaryOutput(
+        title="小熊连续补强外野与轮换",
+        lead="芝加哥小熊在24小时内签下两名核心球员。",
+        body_blocks=[
+            "- 与 Teruaki Sato 达成 **6年1.2亿美元** 合同。",
+            "- 与 Trevor Rogers 达成 **5年1.2亿美元** 合同。",
+            "两笔引援旨在填补休赛期离队空缺。",
+        ],
+    )
+    md = out.to_markdown()
+    assert md.startswith("芝加哥小熊在24小时内签下两名核心球员。\n\n- 与 Teruaki Sato")
+    assert "\n- 与 Trevor Rogers" in md
+    assert "\n\n两笔引援旨在填补休赛期离队空缺。" in md
 
 
 def test_render_summary_html_escapes_html_and_formats_markdown():

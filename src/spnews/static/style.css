@@ -606,9 +606,13 @@ strong {
 }
 
 .event-body p {
-  margin: 0 0 0.8rem;
+  margin: 0 0 0.78rem;
   font-size: 0.94rem;
   line-height: 1.75;
+}
+.event-body > p:first-child:not(:only-child) {
+  font-weight: 500;
+  color: var(--ink);
 }
 .event-body p:last-child {
   margin-bottom: 0;

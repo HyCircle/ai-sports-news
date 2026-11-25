@@ -6,7 +6,14 @@ import httpx
 import numpy as np
 import pytest
 
-from spnews.cluster import ClusteringOutput, centroid_vector, micro_cluster_embeddings
+from spnews.cluster import (
+    ClusteringOutput,
+    FinalEventCluster,
+    centroid_vector,
+    enforce_high_quota,
+    micro_cluster_embeddings,
+)
+from spnews.enrich import _pick_representative_articles, clean_extracted_body
 from spnews.llm import ChatClient, truncate_and_normalize
 
 
@@ -134,3 +141,56 @@ async def test_chat_text_retries_empty_content_and_fails_loudly():
             await c2.chat_text("hi")
     finally:
         await c2._client.aclose()
+
+
+def test_enforce_high_quota_demotes_excess_high():
+    clusters = [
+        FinalEventCluster(title=f"E{i}", importance="high", articles=[]) for i in range(5)
+    ] + [FinalEventCluster(title="M1", importance="medium", articles=[])]
+    out = enforce_high_quota(clusters, max_high=3)
+    assert sum(1 for c in out if c.importance == "high") == 3
+    assert sum(1 for c in out if c.importance == "medium") == 3
+
+
+def test_clean_extracted_body_strips_sky_promos():
+    raw = (
+        "Max Verstappen won the race; watch the Qatar GP live on Sky Sports this weekend, at 4pm\n"
+        "- Got Sky? Watch Premier League games LIVE on your phone\n"
+        "- No Sky? Latest Sky Sports deals\n"
+        "- Man Utd news & transfers | Man Utd fixtures & scores\n"
+        "Verstappen praised his team after the victory."
+    )
+    cleaned = clean_extracted_body(raw)
+    assert "Sky Sports" not in cleaned
+    assert "Got Sky?" not in cleaned
+    assert "Man Utd news" not in cleaned
+    assert "Max Verstappen won the race" in cleaned
+    assert "Verstappen praised his team" in cleaned
+
+
+def test_pick_representative_articles_always_includes_newest():
+    from datetime import UTC, datetime
+
+    arts = [
+        {
+            "id": 1,
+            "source_name": "CBS",
+            "published_at": datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+            "summary": "x" * 500,
+        },
+        {
+            "id": 2,
+            "source_name": "ESPN",
+            "published_at": datetime(2026, 11, 24, 12, 0, tzinfo=UTC),
+            "summary": "y" * 500,
+        },
+        {
+            "id": 3,
+            "source_name": "PFT",
+            "published_at": datetime(2026, 11, 25, 14, 0, tzinfo=UTC),
+            "summary": "Short breaking wire.",
+        },
+    ]
+    picked = _pick_representative_articles(arts, limit=2)
+    assert picked[0]["id"] == 3  # newest breaking wire always preserved
+    assert len(picked) == 2

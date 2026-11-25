@@ -6,6 +6,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -72,7 +73,6 @@ def micro_cluster_embeddings(
     groups: list[list[int]] = []
     if valid_idx:
         mat = np.vstack([_to_float32(embeddings[i]) for i in valid_idx])
-        # Ensure L2 normalization for exact cosine similarity via dot product
         norms = np.linalg.norm(mat, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1.0, norms)
         mat = mat / norms
@@ -106,6 +106,21 @@ def micro_cluster_embeddings(
     return groups
 
 
+def enforce_high_quota(
+    clusters: list[FinalEventCluster],
+    max_high: int,
+) -> list[FinalEventCluster]:
+    """Deterministically enforce per-sport cap on high-importance events."""
+    clusters.sort(key=lambda c: _IMPORTANCE_ORDER[c.importance])
+    high_seen = 0
+    for c in clusters:
+        if c.importance == "high":
+            high_seen += 1
+            if high_seen > max_high:
+                c.importance = "medium"
+    return clusters
+
+
 def _recall_memory_sync(
     dsn: str,
     sport: str,
@@ -113,13 +128,9 @@ def _recall_memory_sync(
     micro_clusters: list[list[int]],
     memory_days: int,
     min_similarity: float,
+    exclude_report_date: str | None = None,
 ) -> tuple[dict[int, dict[str, Any]], dict[int, list[int]]]:
-    """Query pgvector for recent historical events matching each micro-cluster centroid.
-
-    Returns:
-        memory_by_id: {event_id: event_row}
-        cluster_hints: {micro_cluster_id: [matched_event_ids]}
-    """
+    """Query pgvector for recent historical events matching each micro-cluster centroid."""
     memory_by_id: dict[int, dict[str, Any]] = {}
     cluster_hints: dict[int, list[int]] = {}
     for mc_id, indices in enumerate(micro_clusters):
@@ -134,6 +145,7 @@ def _recall_memory_sync(
             days=memory_days,
             limit=3,
             min_similarity=min_similarity,
+            exclude_report_date=exclude_report_date,
         )
         if hits:
             cluster_hints[mc_id] = [int(h["id"]) for h in hits]
@@ -144,25 +156,42 @@ def _recall_memory_sync(
     return memory_by_id, cluster_hints
 
 
+def _short_date(dt: Any, tz: ZoneInfo | None) -> str:
+    if dt is None:
+        return "??-??"
+    if tz is not None and getattr(dt, "tzinfo", None) is not None:
+        dt = dt.astimezone(tz)
+    return dt.strftime("%m-%d")
+
+
 def _format_micro_clusters_prompt(
     articles: list[dict[str, Any]],
     micro_clusters: list[list[int]],
     cluster_hints: dict[int, list[int]],
+    tz: ZoneInfo | None = None,
 ) -> str:
     lines: list[str] = []
     for mc_id, indices in enumerate(micro_clusters):
         hint_str = ""
         if mc_id in cluster_hints:
             hint_str = f" [向量相近历史事件ID: {cluster_hints[mc_id]}]"
-        lines.append(f"[M{mc_id}] ({len(indices)}篇){hint_str}")
-        for idx in indices[:6]:
+        ordered = sorted(
+            indices,
+            key=lambda i: articles[i]["published_at"].timestamp()
+            if articles[i].get("published_at") is not None
+            else 0.0,
+            reverse=True,
+        )
+        lines.append(f"[M{mc_id}] ({len(ordered)}篇){hint_str}")
+        for idx in ordered[:6]:
             art = articles[idx]
-            snippet = (art.get("summary") or "")[:180]
-            lines.append(f"  - ({art['source_name']}) {art['title']}")
+            d_str = _short_date(art.get("published_at"), tz)
+            snippet = (art.get("summary") or "")[:160]
+            lines.append(f"  - [{d_str}] ({art['source_name']}) {art['title']}")
             if snippet:
                 lines.append(f"    {snippet}")
-        if len(indices) > 6:
-            lines.append(f"  - ... 其余 {len(indices) - 6} 篇同源/相近报道")
+        if len(ordered) > 6:
+            lines.append(f"  - ... 其余 {len(ordered) - 6} 篇同源/相近报道")
     return "\n".join(lines)
 
 
@@ -188,6 +217,9 @@ async def cluster_sport_articles(
     sport: str,
     sport_name: str,
     articles: list[dict[str, Any]],
+    *,
+    report_date: str | None = None,
+    tz: ZoneInfo | None = None,
 ) -> tuple[list[FinalEventCluster], dict[str, Any]]:
     """Run hybrid vector + LLM clustering for one sport."""
     if not articles:
@@ -206,36 +238,39 @@ async def cluster_sport_articles(
         micro_clusters,
         settings.memory_days,
         settings.memory_sim_threshold,
+        report_date,
     )
 
-    mc_block = _format_micro_clusters_prompt(articles, micro_clusters, cluster_hints)
+    mc_block = _format_micro_clusters_prompt(articles, micro_clusters, cluster_hints, tz=tz)
     mem_block = _format_memory_prompt(memory_by_id)
+    date_line = f"日报日期：{report_date}\n" if report_date else ""
 
     system = (
-        "你是一位严谨的体育新闻总编。你需要把按语义预聚类后的候选微簇整理成当日日报事件清单，"
-        "并严格输出符合要求的 JSON 对象。"
+        "你是严谨的体育新闻总编。将语义预聚类后的候选微簇整理为当日事件清单，"
+        "严格输出符合 Schema 的 JSON。"
     )
-    user = f"""以下是今天待整理的【{sport_name}】新闻候选微簇（共 {len(micro_clusters)} 个微簇，来自 {len(articles)} 篇文章）：
+    user = f"""{date_line}以下是待整理的【{sport_name}】新闻候选微簇（共 {len(micro_clusters)} 个微簇，来自 {len(articles)} 篇文章）：
 
 {mc_block}
 {mem_block}
 
-请完成以下编排任务：
-1. **合并同事件微簇**：若多个微簇明显报道同一具体事件，将它们的编号合并到同一条事件中。不要把“同队但完全不同的事件”或“整个赛事周末互不相干的 20 条花絮”强行揉成一个大杂烩。
-2. **剔除低价值杂讯**：明显属于投注/赔率/幻想体育推荐、纯视频或播客预告、无实质信息的口水榜单或与本运动无关的条目，直接忽略（不要出现在结果中）。
-3. **写简明中文事件标题**（6–28 字，准确具体）。
-4. **标注重要度**：
-   - `high`：重大赛果、季后赛/争冠关键战、重磅交易/签约/解雇、核心球星重大伤病、重大规则/联盟变故。
-   - `medium`：常规重要赛果、轮换/伤病更新、有实质内容的人事或赛场动态。
-   - `low`：次要动态或简讯。
-5. **跨天连续性关联**：如果某事件是上方历史事件列表的直接后续进展，将 `parent_event_id` 设为对应历史事件的整数 ID；若为全新事件则填 `null`。
-6. **数量控制**：总事件数不超过 {settings.max_events_per_sport} 条，按重要度从高到低排序。
+编排要求：
+1. **合并同事件多角度**：同一具体比赛/分站赛/重磅官宣/同一场联盟会议的多角度报道，合并到同一事件（例如同一场 F1 分站赛的赛果与超车争议、同一场 FIFA 会议官宣多届主办权），不要拆成重复条目；但也不要把不同球队或互不相干的花絮硬凑成大杂烩。
+2. **注意时间先后与过期内容**：对照每条文章前的 [MM-DD] 日期，忽略已过时的赛前前瞻/排位预告（若正赛结果已出），不要把冲突/事故发生前的旧采访误当成事后回应合并进来。
+3. **剔除低价值杂讯**：预测/盘口/幻想体育、口水榜单/实力榜、纯视频/播客、无实质新进展的猜测文章直接忽略。
+4. **临时主题标签**：写简明准确的中文主题标签（终稿标题会在读完全文后定稿）。
+5. **严格控制重要度配额**：
+   - `high`（每项运动 **最多 {settings.max_high_per_sport} 条**）：真正具有跨圈影响力的重磅交易/签约/解雇、冠军或焦点大赛结果、核心球星重伤、重大联盟规则或裁决；**单篇评论/猜测稿不标 `high`**。
+   - `medium`：常规重要赛果、轮换/伤病更新、有实质进展的人事或赛场动态。
+   - `low`：次要简讯。
+6. **跨天连续性**：若为上方历史事件的直接新进展，填对应 `parent_event_id`；否则填 `null`。
+7. **数量上限**：总事件数不超过 {settings.max_events_per_sport} 条，按重要度从高到低排列。
 
-请严格输出如下 JSON 对象：
+严格输出 JSON：
 {{
   "events": [
     {{
-      "title": "中文事件标题",
+      "title": "事件主题标签",
       "importance": "high",
       "micro_cluster_ids": [0, 2],
       "parent_event_id": null
@@ -243,9 +278,7 @@ async def cluster_sport_articles(
   ]
 }}
 
-约束：
-- `micro_cluster_ids` 中的整数必须在 0 到 {len(micro_clusters) - 1} 之间，且每个微簇最多归属 1 个事件。
-- `parent_event_id` 只能是 `null` 或上方历史事件列表里真实出现的整数 ID。"""
+约束：`micro_cluster_ids` 仅含 0 到 {len(micro_clusters) - 1} 的整数且不可重复分配；`parent_event_id` 只能为 `null` 或上方真实历史事件 ID。"""
 
     output = await chat_client.chat_json(user, ClusteringOutput, system=system, temperature=0.1)
 
@@ -273,6 +306,14 @@ async def cluster_sport_articles(
             for art_idx in micro_clusters[mc_id]:
                 cluster_articles.append(articles[art_idx])
 
+        # Keep cluster articles ordered newest-first for downstream enrichment & display
+        cluster_articles.sort(
+            key=lambda a: a["published_at"].timestamp()
+            if a.get("published_at") is not None
+            else 0.0,
+            reverse=True,
+        )
+
         parent_ev = None
         if decision.parent_event_id is not None:
             parent_ev = memory_by_id.get(decision.parent_event_id)
@@ -292,7 +333,7 @@ async def cluster_sport_articles(
             )
         )
 
-    final_clusters.sort(key=lambda c: _IMPORTANCE_ORDER[c.importance])
+    final_clusters = enforce_high_quota(final_clusters, settings.max_high_per_sport)
     final_clusters = final_clusters[: settings.max_events_per_sport]
 
     stats = {
